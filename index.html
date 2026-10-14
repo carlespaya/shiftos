@@ -1,0 +1,2955 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gestor de Horarios Pro - Edición Laboral Compliant v4.0</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════════
+   DESIGN TOKENS — Dark mode (default) + Light mode
+═══════════════════════════════════════════════════════════════ */
+:root {
+  --accent-1: #6366f1;
+  --accent-2: #a855f7;
+  --accent-3: #ec4899;
+  --green:    #10b981;
+  --yellow:   #f59e0b;
+  --red:      #ef4444;
+
+  /* Dark defaults */
+  --bg-base:       #060913;
+  --bg-app:        transparent;
+  --text:          #f1f5f9;
+  --text-strong:   #ffffff;
+  --muted:         #94a3b8;
+  --muted-2:       #64748b;
+  --glass-bg:      rgba(15, 23, 42, 0.6);
+  --glass-bg-2:    rgba(255,255,255,0.03);
+  --glass-border:  rgba(255,255,255,0.10);
+  --glass-hover:   rgba(255,255,255,0.07);
+  --shadow:        0 8px 40px rgba(0,0,0,0.5);
+  --shadow-sm:     0 2px 12px rgba(0,0,0,0.3);
+  --modal-bg:      #0d1526;
+  --input-bg:      rgba(0,0,0,0.3);
+  --table-head:    rgba(0,0,0,0.25);
+  --table-row-hover: rgba(255,255,255,0.03);
+  --blob-opacity:  0.55;
+  --scrollbar:     rgba(255,255,255,0.14);
+  --stat-bg:       rgba(255,255,255,0.03);
+}
+
+[data-theme="light"] {
+  --bg-base:       #e8edf7;
+  --text:          #1e293b;
+  --text-strong:   #0f172a;
+  --muted:         #64748b;
+  --muted-2:       #94a3b8;
+  --glass-bg:      rgba(255,255,255,0.65);
+  --glass-bg-2:    rgba(255,255,255,0.5);
+  --glass-border:  rgba(0,0,0,0.10);
+  --glass-hover:   rgba(0,0,0,0.05);
+  --shadow:        0 8px 40px rgba(99,102,241,0.12);
+  --shadow-sm:     0 2px 12px rgba(0,0,0,0.08);
+  --modal-bg:      #f8faff;
+  --input-bg:      rgba(255,255,255,0.8);
+  --table-head:    rgba(0,0,0,0.04);
+  --table-row-hover: rgba(0,0,0,0.025);
+  --blob-opacity:  0.18;
+  --scrollbar:     rgba(0,0,0,0.18);
+  --stat-bg:       rgba(255,255,255,0.6);
+}
+
+/* ── Base ────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  background-color: var(--bg-base);
+  color: var(--text);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+  transition: background-color 0.4s ease, color 0.4s ease;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Scrollbars ──────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { filter: brightness(1.3); }
+
+/* ── Animated background ─────────────────────────────────────── */
+.bg-blobs {
+  position: fixed; inset: 0;
+  z-index: -1; overflow: hidden;
+  background: var(--bg-base);
+  transition: background 0.4s;
+  /* Isolate blobs to their own compositing layer */
+  contain: strict;
+}
+.blob {
+  position: absolute;
+  /* Smaller blur = cheaper. Visual is nearly identical */
+  filter: blur(70px);
+  opacity: var(--blob-opacity);
+  border-radius: 50%;
+  /* Only animate transform — never triggers layout or paint */
+  animation: blobFloat 20s infinite alternate ease-in-out;
+  /* Promote to GPU layer once, keep there */
+  will-change: transform;
+  transform: translateZ(0);
+}
+/* Smaller blobs = less pixels to blur */
+.blob-1 { top: -10%; left: -8%;  width: 42vw; max-width: 520px; height: 42vw; max-height: 520px; background: radial-gradient(circle, var(--accent-1), transparent 65%); }
+.blob-2 { bottom: -15%; right: -8%; width: 46vw; max-width: 580px; height: 46vw; max-height: 580px; background: radial-gradient(circle, var(--accent-2), transparent 65%); animation-delay: -7s; }
+.blob-3 { top: 38%; left: 42%;  width: 32vw; max-width: 420px; height: 32vw; max-height: 420px; background: radial-gradient(circle, var(--accent-3), transparent 65%); animation-delay: -13s; }
+.blob-4 { top: 55%; left: 8%;   width: 22vw; max-width: 300px; height: 22vw; max-height: 300px; background: radial-gradient(circle, #0ea5e9, transparent 65%); animation-delay: -4s; opacity: calc(var(--blob-opacity) * 0.5); }
+
+@keyframes blobFloat {
+  /* Only translate — no scale/rotate, cheaper composite */
+  0%   { transform: translate3d(0,0,0); }
+  33%  { transform: translate3d(24px,-16px,0); }
+  66%  { transform: translate3d(-14px,22px,0); }
+  100% { transform: translate3d(32px,14px,0); }
+}
+
+/* ── Animations ──────────────────────────────────────────────── */
+@keyframes slideUpFade {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes scaleIn { from { opacity: 0; transform: scale(0.94) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+@keyframes pulse   { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+/* ── Layout ──────────────────────────────────────────────────── */
+.app { max-width: 1440px; margin: auto; padding: 28px 24px 60px; }
+
+/* ── Header ──────────────────────────────────────────────────── */
+header {
+  display: flex; justify-content: space-between; gap: 20px; align-items: center;
+  margin-bottom: 28px;
+  animation: slideUpFade 0.5s ease-out;
+  padding: 20px 24px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid var(--glass-border);
+  border-radius: 22px;
+  box-shadow: var(--shadow-sm);
+}
+
+.logo-area { display: flex; align-items: center; gap: 16px; }
+.logo-icon {
+  width: 46px; height: 46px; border-radius: 14px; flex-shrink: 0;
+  background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; box-shadow: 0 4px 14px rgba(99,102,241,0.4);
+}
+h1 {
+  margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.3px;
+  background: linear-gradient(135deg, var(--text-strong) 30%, var(--accent-1));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+[data-theme="light"] h1 {
+  background: linear-gradient(135deg, #0f172a 30%, var(--accent-1));
+  -webkit-background-clip: text; background-clip: text;
+}
+.subtitle { color: var(--muted); margin-top: 3px; font-size: 13px; }
+
+/* ── Buttons ─────────────────────────────────────────────────── */
+button, input, select { font: inherit; outline: none; }
+button { cursor: pointer; transition: all 0.25s cubic-bezier(0.4,0,0.2,1); }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+.btn {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  color: var(--text);
+  padding: 9px 16px; border-radius: 11px;
+  font-weight: 500; font-size: 13px;
+  display: inline-flex; align-items: center; gap: 6px;
+  white-space: nowrap;
+}
+.btn:hover { background: var(--glass-hover); transform: translateY(-2px); box-shadow: var(--shadow-sm); }
+.btn:active { transform: translateY(0); }
+
+.btn.primary {
+  background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+  border: none; color: #fff;
+  box-shadow: 0 4px 16px rgba(99,102,241,0.35);
+}
+.btn.primary:hover { box-shadow: 0 6px 22px rgba(99,102,241,0.55); filter: brightness(1.08); }
+
+.btn.danger { background: rgba(239,68,68,0.12); border-color: rgba(239,68,68,0.25); color: #fca5a5; }
+.btn.danger:hover { background: rgba(239,68,68,0.22); }
+
+.btn.success { background: rgba(16,185,129,0.12); border-color: rgba(16,185,129,0.25); color: #6ee7b7; }
+.btn.success:hover { background: rgba(16,185,129,0.22); }
+
+/* Theme toggle */
+.theme-toggle {
+  width: 36px; height: 36px; border-radius: 10px; padding: 0;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  font-size: 18px; display: flex; align-items: center; justify-content: center;
+}
+.theme-toggle:hover { transform: rotate(20deg) scale(1.1); }
+
+/* ── Tabs ────────────────────────────────────────────────────── */
+.tabs {
+  display: flex; gap: 4px; margin-bottom: 28px;
+  overflow-x: auto; padding-bottom: 2px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  padding: 5px; border-radius: 16px;
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-sm);
+  animation: slideUpFade 0.5s ease-out 0.08s both;
+  scrollbar-width: none;
+}
+.tabs::-webkit-scrollbar { display: none; }
+
+.tab {
+  background: transparent; border: 0;
+  color: var(--muted); padding: 9px 15px;
+  border-radius: 11px; white-space: nowrap;
+  font-weight: 500; font-size: 13px; flex-shrink: 0;
+  position: relative;
+}
+.tab:hover { color: var(--text); background: var(--glass-hover); }
+.tab.active {
+  background: linear-gradient(135deg, rgba(99,102,241,0.2), rgba(168,85,247,0.15));
+  color: var(--text-strong);
+  border: 1px solid rgba(99,102,241,0.25);
+  box-shadow: 0 2px 10px rgba(99,102,241,0.15);
+}
+/* Special tabs */
+.tab-legal { color: #6ee7b7 !important; }
+.tab-legal.active { background: linear-gradient(135deg, rgba(16,185,129,0.15), rgba(5,150,105,0.1)) !important; border-color: rgba(16,185,129,0.3) !important; }
+.tab-optimizer { color: #fbbf24 !important; }
+.tab-optimizer.active { background: linear-gradient(135deg, rgba(251,191,36,0.15), rgba(245,158,11,0.1)) !important; border-color: rgba(251,191,36,0.3) !important; }
+
+/* ── Views ───────────────────────────────────────────────────── */
+.view { display: none; }
+.view.active { display: block; animation: slideUpFade 0.4s cubic-bezier(0.16,1,0.3,1) forwards; }
+
+/* ── Grid ────────────────────────────────────────────────────── */
+.grid { display: grid; grid-template-columns: repeat(12,1fr); gap: 20px; }
+.span-12 { grid-column: span 12; }
+.span-8  { grid-column: span 8; }
+.span-6  { grid-column: span 6; }
+.span-4  { grid-column: span 4; }
+@media (max-width: 900px) {
+  .span-8,.span-6,.span-4 { grid-column: span 12; }
+}
+
+/* ── Cards ───────────────────────────────────────────────────── */
+.card {
+  background: var(--glass-bg);
+  /* backdrop-filter only on the header/tabs which sit over the blobs.
+     Cards are over the app bg which is already opaque-ish —
+     a simple semi-transparent bg is visually equivalent but 10× cheaper. */
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  padding: 22px 24px;
+  box-shadow: var(--shadow);
+  /* Only animate opacity/transform — never width/height/background */
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  position: relative;
+  overflow: hidden;
+  /* Contain paints inside card boundary */
+  contain: layout style;
+}
+.card::before {
+  content: '';
+  position: absolute; inset: 0;
+  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.03) 0%, transparent 55%);
+  pointer-events: none;
+}
+.card h2 {
+  font-size: 16px; margin: 0 0 18px;
+  font-weight: 600; display: flex; align-items: center; gap: 8px;
+  color: var(--text-strong);
+}
+.card h2 .h2-icon {
+  width: 30px; height: 30px; border-radius: 8px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; font-size: 15px;
+  background: linear-gradient(135deg, rgba(99,102,241,0.2), rgba(168,85,247,0.15));
+  border: 1px solid rgba(99,102,241,0.2);
+}
+
+/* Card accent top line */
+.card-accent::after {
+  content: '';
+  position: absolute; top: 0; left: 24px; right: 24px; height: 2px;
+  background: linear-gradient(90deg, var(--accent-1), var(--accent-2), var(--accent-3));
+  border-radius: 0 0 4px 4px;
+}
+
+/* ── Stats ───────────────────────────────────────────────────── */
+.stats { display: grid; grid-template-columns: repeat(auto-fit,minmax(160px,1fr)); gap: 14px; contain: layout; }
+.stat {
+  padding: 18px 20px; border-radius: 16px;
+  background: var(--stat-bg);
+  border: 1px solid var(--glass-border);
+  transition: transform 0.2s, box-shadow 0.2s;
+  position: relative; overflow: hidden;
+  contain: layout style;
+  /* No backdrop-filter on stats — they're numerous */
+}
+.stat::after {
+  content: '';
+  position: absolute; bottom: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, var(--accent-1), var(--accent-2));
+  opacity: 0; transition: opacity 0.3s;
+}
+.stat:hover { transform: translateY(-5px); box-shadow: 0 12px 30px rgba(0,0,0,0.15); }
+.stat:hover::after { opacity: 1; }
+.stat-icon { font-size: 20px; margin-bottom: 10px; display: block; }
+.stat strong {
+  display: block; font-size: 30px; font-weight: 800; line-height: 1;
+  margin-bottom: 6px;
+  background: linear-gradient(135deg, var(--text-strong), var(--accent-1));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.stat span { color: var(--muted); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; }
+
+/* ── Forms ───────────────────────────────────────────────────── */
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(140px,1fr)); gap: 14px; }
+label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 7px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; }
+input, select {
+  width: 100%;
+  background: var(--input-bg);
+  color: var(--text);
+  border: 1px solid var(--glass-border);
+  border-radius: 10px; padding: 11px 14px;
+  transition: all 0.25s;
+  backdrop-filter: blur(8px);
+}
+input:focus, select:focus {
+  border-color: var(--accent-1);
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.18);
+  background: var(--input-bg);
+  outline: none;
+}
+input[type="checkbox"] { width: auto; }
+.form-actions { display: flex; gap: 10px; margin-top: 18px; }
+
+/* ── Sub-tabs ────────────────────────────────────────────────── */
+.sub-tabs { display: flex; gap: 4px; margin-bottom: 14px; background: var(--glass-bg-2); padding: 4px; border-radius: 10px; border: 1px solid var(--glass-border); }
+.sub-tab { flex: 1; background: transparent; border: 0; color: var(--muted); padding: 8px 10px; border-radius: 8px; font-size: 13px; font-weight: 500; text-align: center; }
+.sub-tab.active { background: var(--glass-hover); color: var(--text); box-shadow: var(--shadow-sm); }
+
+/* ── Tables ──────────────────────────────────────────────────── */
+.table-wrap { overflow-x: auto; border-radius: 14px; background: var(--glass-bg-2); border: 1px solid var(--glass-border); }
+table { width: 100%; border-collapse: collapse; min-width: 680px; text-align: left; }
+th, td { padding: 13px 16px; border-bottom: 1px solid var(--glass-border); font-size: 13.5px; }
+th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; background: var(--table-head); position: sticky; top: 0; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: var(--table-row-hover); }
+
+/* ── Badges ──────────────────────────────────────────────────── */
+.badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 3px 10px; border-radius: 99px;
+  background: rgba(255,255,255,0.1); color: var(--text);
+  font-size: 11.5px; font-weight: 600; white-space: nowrap;
+}
+.badge.green  { background: rgba(16,185,129,0.18); color: #34d399; border: 1px solid rgba(16,185,129,0.25); }
+.badge.red    { background: rgba(239,68,68,0.18);  color: #f87171; border: 1px solid rgba(239,68,68,0.25); }
+.badge.yellow { background: rgba(245,158,11,0.18); color: #fbbf24; border: 1px solid rgba(245,158,11,0.25); }
+.badge.purple { background: rgba(168,85,247,0.18); color: #d8b4fe; border: 1px solid rgba(168,85,247,0.25); }
+.badge.blue   { background: rgba(99,102,241,0.18); color: #818cf8; border: 1px solid rgba(99,102,241,0.25); }
+.badge.orange { background: rgba(249,115,22,0.18); color: #fb923c; border: 1px solid rgba(249,115,22,0.25); }
+.badge.teal   { background: rgba(20,184,166,0.18); color: #2dd4bf; border: 1px solid rgba(20,184,166,0.25); }
+
+.hours-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 11px; border-radius: 99px; font-size: 12px; font-weight: 700; }
+.hours-ok  { background: rgba(16,185,129,0.15); color: #34d399; border: 1px solid rgba(16,185,129,0.3); }
+.hours-low { background: rgba(245,158,11,0.15); color: #fbbf24; border: 1px solid rgba(245,158,11,0.3); }
+.hours-over{ background: rgba(239,68,68,0.15);  color: #f87171; border: 1px solid rgba(239,68,68,0.3); }
+
+/* ── Notice / Empty ──────────────────────────────────────────── */
+.notice {
+  padding: 14px 18px; border-radius: 12px;
+  background: rgba(99,102,241,0.08);
+  border: 1px solid rgba(99,102,241,0.18);
+  color: var(--text); margin: 0 0 18px;
+  font-size: 13.5px; line-height: 1.55;
+}
+.empty {
+  color: var(--muted); text-align: center; padding: 48px 20px;
+  border: 1.5px dashed var(--glass-border); border-radius: 14px;
+  font-size: 14px;
+}
+.empty-icon { font-size: 36px; margin-bottom: 10px; opacity: 0.6; }
+
+/* ── Legal banner ────────────────────────────────────────────── */
+.legal-banner {
+  padding: 14px 18px; border-radius: 14px;
+  background: rgba(16,185,129,0.07); border: 1px solid rgba(16,185,129,0.22);
+  color: var(--text); font-size: 13px; line-height: 1.6; margin-bottom: 18px;
+}
+.legal-banner strong { color: #6ee7b7; }
+
+/* ── Worker & AI cards ───────────────────────────────────────── */
+.worker-card {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 14px 16px; border: 1px solid var(--glass-border); border-radius: 14px;
+  margin-bottom: 10px; background: var(--glass-bg-2);
+  /* Only animate transform, not 'all' — avoids triggering layout */
+  transition: transform 0.18s ease, border-color 0.18s ease;
+  position: relative; overflow: hidden;
+  contain: layout style;
+}
+.worker-card::before {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  background: linear-gradient(180deg, var(--accent-1), var(--accent-2));
+  border-radius: 99px 0 0 99px; opacity: 0; transition: opacity 0.2s;
+}
+.worker-card:hover { background: var(--glass-hover); transform: translateX(3px); border-color: rgba(99,102,241,0.2); }
+.worker-card:hover::before { opacity: 1; }
+.worker-card strong { font-size: 15px; color: var(--text-strong); }
+
+.ai-card {
+  display: flex; gap: 14px; align-items: flex-start;
+  padding: 16px; border: 1px solid rgba(168,85,247,0.25); border-radius: 14px;
+  margin-bottom: 10px;
+  background: linear-gradient(135deg, rgba(168,85,247,0.08), rgba(99,102,241,0.04));
+  transition: all 0.2s;
+}
+.ai-card:hover { border-color: rgba(168,85,247,0.4); transform: translateY(-2px); }
+.ai-icon { font-size: 22px; background: rgba(168,85,247,0.15); padding: 9px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.ai-content strong { display: block; font-size: 14px; margin-bottom: 4px; color: #d8b4fe; }
+.ai-content p { margin: 0; font-size: 13px; color: var(--text); line-height: 1.5; }
+
+/* ── Schedule grid ───────────────────────────────────────────── */
+.schedule { border: 1px solid var(--glass-border); border-radius: 16px; overflow: hidden; background: var(--glass-bg-2); }
+.schedule table { min-width: 1180px; }
+.schedule th { text-align: center; background: var(--table-head); border-right: 1px solid var(--glass-border); font-size: 12px; }
+.schedule th:first-child { min-width: 170px; text-align: left; }
+.schedule td { vertical-align: top; min-height: 80px; border-right: 1px solid var(--glass-border); padding: 7px; }
+
+.cell {
+  min-height: 52px; border-radius: 10px; padding: 9px 11px; margin: 3px 0;
+  background: var(--glass-bg-2);
+  border: 1px solid var(--glass-border);
+  border-left: 3px solid var(--accent-1);
+  cursor: pointer;
+  /* Only transition compositor properties */
+  transition: transform 0.15s ease, opacity 0.15s ease;
+  position: relative;
+  will-change: transform;
+}
+.cell:hover { transform: scale(1.022); opacity: 0.92; }
+.cell strong { display: block; font-size: 12.5px; margin-bottom: 2px; color: var(--text-strong); }
+.cell small  { display: block; color: var(--muted); font-size: 10.5px; }
+
+.conflict  { border-left-color: var(--red);   background: rgba(239,68,68,0.08);  }
+.free      { border-left-color: var(--green); background: rgba(16,185,129,0.07); }
+.doubling  { border-left-color: #a855f7;      background: rgba(168,85,247,0.10); }
+
+.cell.highlighted {
+  background: rgba(99,102,241,0.25) !important;
+  border-color: var(--accent-1) !important;
+  box-shadow: 0 0 16px rgba(99,102,241,0.4);
+  transform: scale(1.035);
+  z-index: 1;
+}
+.schedule table:hover .cell:not(.highlighted):not(.free) { opacity: 0.38; }
+.schedule table .cell.highlighted { opacity: 1 !important; }
+
+/* ── Progress bars ───────────────────────────────────────────── */
+.progress {
+  height: 7px; background: var(--glass-bg-2);
+  border: 1px solid var(--glass-border);
+  border-radius: 99px; overflow: hidden; margin-top: 8px;
+}
+.progress i {
+  display: block; height: 100%; width: 100%;
+  background: linear-gradient(90deg, var(--accent-1), var(--accent-2));
+  border-radius: 99px;
+  /* transform is compositor-only — far cheaper than animating width */
+  transform-origin: left center;
+  transition: transform 0.5s cubic-bezier(0.34,1.56,0.64,1);
+  will-change: transform;
+}
+
+/* ── KPI label ───────────────────────────────────────────────── */
+.kpi { font-size: 12px; color: var(--muted); margin-top: 3px; line-height: 1.45; }
+
+/* ── Modal ───────────────────────────────────────────────────── */
+.modal {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(8px) saturate(120%);
+  display: none; align-items: center; justify-content: center;
+  padding: 20px; z-index: 50;
+}
+.modal.show { display: flex; animation: fadeIn 0.25s; }
+.modal-box {
+  width: min(520px,100%);
+  background: var(--modal-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 22px; padding: 26px;
+  box-shadow: 0 30px 60px rgba(0,0,0,0.4);
+  animation: scaleIn 0.28s cubic-bezier(0.16,1,0.3,1);
+}
+.modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.modal-head h2 { margin: 0; font-size: 19px; }
+
+/* ── Opt cards ───────────────────────────────────────────────── */
+.opt-rec-card {
+  border-radius: 14px; padding: 18px 20px; margin-bottom: 12px;
+  background: linear-gradient(135deg,rgba(251,191,36,0.06),rgba(99,102,241,0.04));
+  border: 1px solid rgba(251,191,36,0.2);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.opt-rec-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(251,191,36,0.1); }
+.opt-rec-card .contract-badge {
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px;
+  border-radius: 99px; font-size: 12px; font-weight: 700;
+  background: rgba(251,191,36,0.12); color: #fbbf24; border: 1px solid rgba(251,191,36,0.25);
+}
+.opt-kpi-row { display: grid; grid-template-columns: repeat(auto-fit,minmax(130px,1fr)); gap: 10px; margin-top: 14px; }
+.opt-kpi { padding: 12px 14px; border-radius: 12px; background: var(--glass-bg-2); text-align: center; border: 1px solid var(--glass-border); }
+.opt-kpi strong { display: block; font-size: 22px; font-weight: 800; color: #fbbf24; margin-bottom: 4px; }
+.opt-kpi span { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.7px; }
+.deficit-bar { height: 5px; border-radius: 99px; background: var(--glass-bg-2); margin-top: 6px; overflow: hidden; }
+.deficit-bar i { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg,#ef4444,#f59e0b); }
+.opt-summary-banner { padding: 20px 22px; border-radius: 14px; display: flex; align-items: center; gap: 16px; margin-bottom: 18px; }
+.opt-tag { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 99px; font-size: 11px; font-weight: 600; }
+.opt-tag.full { background: rgba(99,102,241,0.18); color: #a5b4fc; }
+.opt-tag.p30  { background: rgba(16,185,129,0.18);  color: #6ee7b7; }
+.opt-tag.p20  { background: rgba(245,158,11,0.18);  color: #fbbf24; }
+.opt-tag.p16  { background: rgba(168,85,247,0.18);  color: #d8b4fe; }
+.opt-tag.p12  { background: rgba(236,72,153,0.18);  color: #f9a8d4; }
+
+/* ── Misc helpers ────────────────────────────────────────────── */
+.weekly-rest-ok   { border-left-color: var(--green) !important; }
+.weekly-rest-warn { border-left-color: var(--red)   !important; background: rgba(239,68,68,0.06) !important; }
+.hour-overflow    { background: rgba(245,158,11,0.15); color: #fbbf24; border: 1px solid rgba(245,158,11,0.25); }
+.hours-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 11px; border-radius: 99px; font-size: 12px; font-weight: 700; }
+.hours-ok  { background: rgba(16,185,129,0.15); color: #34d399; border: 1px solid rgba(16,185,129,0.3); }
+.hours-low { background: rgba(245,158,11,0.15); color: #fbbf24; border: 1px solid rgba(245,158,11,0.3); }
+.hours-over{ background: rgba(239,68,68,0.15);  color: #f87171; border: 1px solid rgba(239,68,68,0.3); }
+
+/* ── Divider ─────────────────────────────────────────────────── */
+.divider { height: 1px; background: var(--glass-border); margin: 18px 0; }
+
+/* ── Toast notification ──────────────────────────────────────── */
+#toast {
+  position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(80px);
+  background: var(--modal-bg); border: 1px solid var(--glass-border);
+  color: var(--text); padding: 12px 22px; border-radius: 14px;
+  font-size: 14px; font-weight: 500; z-index: 999;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+  transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1), opacity 0.35s;
+  opacity: 0; display: flex; align-items: center; gap: 10px; backdrop-filter: blur(16px);
+}
+#toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+#toast .toast-icon { font-size: 18px; }
+
+/* ── Week selector ───────────────────────────────────────────── */
+.week-selector {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--glass-bg); border: 1px solid var(--glass-border);
+  border-radius: 12px; padding: 6px 12px;
+  font-size: 13px; font-weight: 500; color: var(--text);
+  backdrop-filter: blur(10px);
+}
+.week-nav { background: none; border: none; color: var(--muted); font-size: 18px; padding: 2px 6px; border-radius: 6px; }
+.week-nav:hover { background: var(--glass-hover); color: var(--text); }
+#weekLabel { font-weight: 600; min-width: 130px; text-align: center; color: var(--text-strong); }
+
+/* ── Shimmer loading ─────────────────────────────────────────── */
+.shimmer {
+  background: linear-gradient(90deg, var(--glass-bg-2) 25%, var(--glass-hover) 50%, var(--glass-bg-2) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 8px; height: 16px;
+}
+
+/* ── Quick action toolbar (schedule) ────────────────────────── */
+.toolbar {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-bottom: 14px; padding: 10px 14px;
+  background: var(--glass-bg); border: 1px solid var(--glass-border);
+  border-radius: 12px; backdrop-filter: blur(10px);
+}
+.toolbar-label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-right: 4px; }
+
+/* ── Footer ──────────────────────────────────────────────────── */
+.footer-note {
+  text-align: center; color: var(--muted); font-size: 12px;
+  margin-top: 48px; opacity: 0.6; letter-spacing: 0.2px;
+}
+</style>
+</head>
+<body>
+
+<div class="bg-blobs">
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  <div class="blob blob-3"></div>
+  <div class="blob blob-4"></div>
+</div>
+<div id="toast"><span class="toast-icon">✅</span><span id="toastMsg"></span></div>
+
+<div class="app">
+  <header>
+    <div class="logo-area">
+      <div class="logo-icon">📅</div>
+      <div>
+        <h1>ShiftOS Pro</h1>
+        <div class="subtitle">Motor ET España · Cuadrantes · Cumplimiento · Optimización</div>
+      </div>
+    </div>
+    <div class="actions">
+      <div class="week-selector">
+        <button class="week-nav" onclick="changeWeek(-1)" title="Semana anterior">‹</button>
+        <span id="weekLabel">Sem. actual</span>
+        <button class="week-nav" onclick="changeWeek(1)" title="Semana siguiente">›</button>
+      </div>
+      <button class="btn" onclick="loadDemo()">✨ Demo</button>
+      <button class="btn" onclick="exportCSV()">⬇ CSV</button>
+      <button class="btn danger" onclick="resetData()">🗑</button>
+      <button class="btn primary" onclick="generateSchedule()">⚡ Generar cuadrante</button>
+      <button class="theme-toggle" onclick="toggleTheme()" id="themeBtn" title="Cambiar tema">🌙</button>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="dashboard">📊 Resumen</button>
+    <button class="tab" data-tab="shifts">🕐 Turnos</button>
+    <button class="tab" data-tab="needs">📋 Necesidades</button>
+    <button class="tab" data-tab="workers">👥 Personal</button>
+    <button class="tab" data-tab="exceptions">🚫 Excepciones</button>
+    <button class="tab" data-tab="vacations">🏖 Vacaciones</button>
+    <button class="tab" data-tab="schedule">📅 Cuadrante</button>
+    <button class="tab" data-tab="clockin">⏱ Fichajes</button>
+    <button class="tab" data-tab="diagnostics">🔍 Auditoría</button>
+    <button class="tab tab-legal" data-tab="compliance">⚖ Cumplimiento</button>
+    <button class="tab tab-optimizer" data-tab="optimizer">🎯 Plantilla Óptima</button>
+  </div>
+
+  <!-- DASHBOARD -->
+  <section id="dashboard" class="view active">
+    <div class="stats" id="stats"></div>
+   <div class="legal-banner" style="margin-top:16px;">
+     <strong>⚖ Reglas laborales activas (ET España):</strong>
+     <span style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap: 6px 20px; margin-top:8px; font-size:12px;">
+       <span>🕘 Máx. <b>9 h ordinarias/día</b> (Art. 34.3 ET)</span>
+       <span>📅 Máx. <b>40 h ordinarias/semana</b> (Art. 34.1 ET)</span>
+       <span>😴 Mín. <b>12 h de descanso entre jornadas</b> (Art. 34.3 ET)</span>
+       <span>🏖 Mín. <b>1,5 días descanso semanal</b> (Art. 37.1 ET)</span>
+       <span>⏱ <b>Horas extra voluntarias</b> requieren acuerdo — marcadas como refuerzo</span>
+       <span>✅ Prioridad: cada trabajador <b>cumple SUS horas contratadas</b></span>
+     </span>
+   </div>
+    <div class="grid" style="margin-top:24px">
+      <div class="card span-6">
+        <h2>Estado de cobertura general</h2>
+        <div id="coverage"></div>
+      </div>
+      <div class="card span-6">
+        <h2>Horas Contratadas vs Cubiertas</h2>
+        <div id="hoursComparisonStats"></div>
+      </div>
+      <div class="card span-12">
+        <h2>Horas por trabajador — Objetivo semanal</h2>
+        <div id="hoursSummary"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CUMPLIMIENTO LEGAL -->
+  <section id="compliance" class="view">
+    <div class="grid">
+      <div class="card span-12">
+        <h2>⚖ Panel de Cumplimiento Legal (Estatuto de los Trabajadores)</h2>
+        <div class="notice" style="background:rgba(16,185,129,0.08); border-color:rgba(16,185,129,0.3); color:#d1fae5; margin-bottom:20px;">
+          Verificación automática de todos los derechos laborales aplicables al cuadrante actual. Las alertas en rojo requieren acción inmediata antes de publicar el horario.
+        </div>
+        <div id="compliancePanel"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TURNOS -->
+  <section id="shifts" class="view">
+    <div class="grid">
+      <div class="card span-4">
+        <h2 id="shiftFormTitle">Configurar turno</h2>
+        <input type="hidden" id="sEditId">
+        <div class="form-grid">
+          <div><label>Identificador</label><input id="sName" placeholder="Ej. Mañana"></div>
+          <div><label>Hora Inicio</label><input id="sStart" type="time" value="09:00" onchange="calcShiftHours()"></div>
+          <div><label>Hora Fin</label><input id="sEnd" type="time" value="17:00" onchange="calcShiftHours()"></div>
+          <div><label>Total Horas (Auto)</label><input id="sHours" type="number" step=".5" value="8" readonly style="background: rgba(0,0,0,0.4)"></div>
+        </div>
+        <div id="shiftLegalWarning" style="display:none; margin-top:10px; padding:10px 14px; border-radius:10px; background:rgba(239,68,68,0.12); border:1px solid rgba(239,68,68,0.3); color:#fca5a5; font-size:13px;"></div>
+        <div class="form-actions">
+          <button class="btn primary" style="flex:1" onclick="saveShift()">Guardar turno</button>
+          <button class="btn" id="sCancelBtn" style="display:none" onclick="resetShiftForm()">Cancelar</button>
+        </div>
+      </div>
+      <div class="card span-8">
+        <h2>Turnos disponibles</h2>
+        <div id="shiftsList"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- NECESIDADES -->
+  <section id="needs" class="view">
+    <div class="grid">
+      <div class="card span-4">
+        <h2>Crear Puestos</h2>
+        <div class="notice">Define los roles operativos del negocio.</div>
+        <div class="form-grid">
+          <div style="grid-column:span 2"><label>Nombre del puesto</label><input id="pName" placeholder="Ej. Recepción"></div>
+        </div>
+        <div class="form-actions"><button class="btn primary" style="width:100%" onclick="addPosition()">Añadir puesto</button></div>
+        <div id="positionsList" style="margin-top:24px"></div>
+      </div>
+      <div class="card span-8">
+        <h2>Personal requerido (Día / Turno / Puesto)</h2>
+        <div id="needsTable"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TRABAJADORES -->
+  <section id="workers" class="view">
+    <div class="grid">
+      <div class="card span-4">
+        <h2>Gestión de Empleados</h2>
+        <div class="sub-tabs">
+          <button class="sub-tab active" id="tabModeIndividual" onclick="setWorkerMode('individual')">Individual</button>
+          <button class="sub-tab" id="tabModeZone" onclick="setWorkerMode('zone')">Por Zona / Lote</button>
+        </div>
+
+        <div id="formModeIndividual">
+          <div class="form-grid">
+            <div style="grid-column:span 2"><label>Nombre</label><input id="wName" placeholder="Ej. Marta Díaz"></div>
+            <div><label>Horas / Semana</label><input id="wHours" type="number" min="0" max="40" value="40"></div>
+            <div><label>Días máx. / Semana</label><input id="wDays" type="number" min="1" max="6" value="5" title="Máximo recomendado: 6 días (1,5 días descanso semanal)"></div>
+            <div><label>Puesto principal</label><select id="wPosition"></select></div>
+            <div><label>Tipo contrato</label><select id="wContractType"><option value="indefinido">Indefinido</option><option value="temporal">Temporal</option><option value="parcial">Parcial</option></select></div>
+            <div style="grid-column:span 2; display:flex; align-items:center; gap:10px; padding:10px 14px; border-radius:10px; background:rgba(99,102,241,0.08); border:1px solid rgba(99,102,241,0.2);">
+              <input type="checkbox" id="wAllowDouble" style="width:16px; height:16px; cursor:pointer;">
+              <label for="wAllowDouble" style="margin:0; color:#a5b4fc; font-size:13px; cursor:pointer;">
+                <strong>Puede doblar turno</strong> — acepta dos turnos el mismo día si la suma ≤ 9h y hay hueco de servicio
+              </label>
+            </div>
+          </div>
+          <div class="form-actions"><button class="btn primary" style="width:100%" onclick="addWorker()">Añadir empleado</button></div>
+        </div>
+
+        <div id="formModeZone" style="display: none;">
+          <div class="notice" style="margin-bottom: 12px; font-size: 13px;">
+            Añade múltiples trabajadores automáticamente a una zona de trabajo con identificadores y nombres autogenerados.
+          </div>
+          <div class="form-grid">
+            <div><label>Zona / Puesto</label><select id="wZonePosition"></select></div>
+            <div><label>Cantidad de trabajadores</label><input id="wZoneCount" type="number" min="1" max="20" value="3"></div>
+            <div><label>Prefijo del Nombre</label><input id="wZonePrefix" placeholder="Ej. Empleado Sala"></div>
+            <div><label>Horas / Semana (cada uno)</label><input id="wZoneHours" type="number" min="0" value="40"></div>
+            <div><label>Días máx. / Semana</label><input id="wZoneDays" type="number" min="1" max="6" value="5" title="Máx. 6 días (descanso 1,5 días ET Art.37.1)"></div>
+            <div style="grid-column:span 2; display:flex; align-items:center; gap:10px; padding:10px 14px; border-radius:10px; background:rgba(99,102,241,0.08); border:1px solid rgba(99,102,241,0.2);">
+              <input type="checkbox" id="wZoneAllowDouble" style="width:16px; height:16px; cursor:pointer;">
+              <label for="wZoneAllowDouble" style="margin:0; color:#a5b4fc; font-size:13px; cursor:pointer;"><strong>Pueden doblar turno</strong> (suma ≤ 9h/día)</label>
+            </div>
+          </div>
+          <div class="form-actions"><button class="btn primary" style="width:100%" onclick="addWorkersByZone()">Añadir trabajadores por zona</button></div>
+        </div>
+
+      </div>
+      <div class="card span-8">
+        <h2>Plantilla actual</h2>
+        <div id="workersList"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- EXCEPCIONES -->
+  <section id="exceptions" class="view">
+    <div class="grid">
+      <div class="card span-4">
+        <h2>Añadir regla</h2>
+        <div class="form-grid">
+          <div style="grid-column:span 2"><label>Empleado</label><select id="eWorker"></select></div>
+          <div style="grid-column:span 2"><label>Día de la semana</label><select id="eDay"></select></div>
+          <div style="grid-column:span 2"><label>Turno afectado</label><select id="eShift"></select></div>
+          <div style="grid-column:span 2"><label>Tipo de regla</label><select id="eType"><option value="unavailable">Bloqueado (No puede)</option><option value="preferred">Preferencia (Deseado)</option></select></div>
+        </div>
+        <div class="form-actions"><button class="btn primary" style="width:100%" onclick="addException()">Registrar regla</button></div>
+      </div>
+      <div class="card span-8">
+        <h2>Restricciones activas</h2>
+        <div id="exceptionsList"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- VACACIONES Y PERMISOS -->
+  <section id="vacations" class="view">
+    <div class="grid">
+      <div class="card span-4">
+        <h2>Solicitud de Vacaciones / Permiso</h2>
+        <div class="notice">Las ausencias aprobadas bloquean automáticamente al empleado en el motor de turnos.</div>
+        <div class="form-grid">
+          <div style="grid-column:span 2"><label>Empleado</label><select id="vWorker"></select></div>
+          <div><label>Fecha Inicio</label><input id="vStart" type="date"></div>
+          <div><label>Fecha Fin</label><input id="vEnd" type="date"></div>
+          <div style="grid-column:span 2"><label>Motivo</label><input id="vReason" placeholder="Ej. Vacaciones de verano / Asuntos propios"></div>
+        </div>
+        <div class="form-actions"><button class="btn primary" style="width:100%" onclick="addVacation()">Añadir periodo vacacional</button></div>
+      </div>
+      <div class="card span-8">
+        <h2>Vacaciones y Permisos Registrados</h2>
+        <div id="vacationsList"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CUADRANTE -->
+  <section id="schedule" class="view">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:20px;">
+        <div>
+          <h2 style="margin-bottom:4px">Cuadrante Semanal</h2>
+          <div class="kpi">Pasa el ratón por encima del nombre de un empleado para iluminar sus turnos en la semana. Haz clic en una tarjeta para editarla.</div>
+        </div>
+        <button class="btn primary" onclick="generateSchedule()">Re-calcular horarios</button>
+      </div>
+
+      <div class="sub-tabs" style="margin-bottom: 20px;">
+        <button class="sub-tab active" id="subTabGrid" onclick="setScheduleSubTab('grid')">Vista General (Parrilla)</button>
+        <button class="sub-tab" id="subTabPersonal" onclick="setScheduleSubTab('personal')">Consulta Individual por Trabajador</button>
+      </div>
+
+      <div id="scheduleGridView">
+        <div id="scheduleBox"></div>
+      </div>
+
+      <div id="schedulePersonalView" style="display: none;">
+        <div style="max-width: 600px; margin: 0 auto; background: rgba(0,0,0,0.2); padding: 20px; border-radius: 14px; border: 1px solid var(--glass-border);">
+          <label style="margin-bottom: 8px;">Selecciona tu nombre para ver tus turnos asignados:</label>
+          <select id="scheduleWorkerSelect" onchange="renderPersonalSchedule()" style="margin-bottom: 20px;">
+            <option value="">-- Elige un empleado --</option>
+          </select>
+          <div id="personalScheduleResult">
+            <div class="empty">Selecciona un empleado arriba para ver su horario detallado de la semana.</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- FICHAJES -->
+  <section id="clockin" class="view">
+    <div class="grid">
+      <div class="card span-4">
+        <h2>Control de Asistencia</h2>
+        <div class="notice">Registra la entrada y salida real para auditar desviaciones respecto al cuadrante.</div>
+        <div class="form-grid">
+          <div style="grid-column:span 2"><label>Empleado</label><select id="ciWorker"></select></div>
+          <div><label>Fecha</label><input id="ciDate" type="date"></div>
+          <div><label>Tipo de fichaje</label><select id="ciType"><option value="in">Entrada (Clock-In)</option><option value="out">Salida (Clock-Out)</option></select></div>
+          <div><label>Hora real</label><input id="ciTime" type="time"></div>
+        </div>
+        <div class="form-actions"><button class="btn primary" style="width:100%" onclick="addClockRecord()">Registrar fichaje</button></div>
+      </div>
+      <div class="card span-8">
+        <h2>Registro de fichajes en tiempo real</h2>
+        <div id="clockRecordsList"></div>
+      </div>
+      <div class="card span-12">
+        <h2>📊 Resumen de horas reales fichadas vs. contrato</h2>
+        <div class="notice" style="font-size:13px; margin-bottom:14px;">Las horas reales se calculan emparejando entradas y salidas del mismo día. Las desviaciones ≥ 15 min respecto al turno asignado se marcan como incidencia.</div>
+        <div id="clockSummary"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- DIAGNOSTICO E INSIGHTS -->
+  <section id="diagnostics" class="view">
+    <div class="grid">
+      <div class="card span-12">
+        <h2>🧠 Auditoría Estratégica y Simulación de Personal Extra</h2>
+        <div class="notice" style="background: rgba(168, 85, 247, 0.1); border-color: rgba(168, 85, 247, 0.3); color: #e9d5ff;">
+          Análisis automatizado de desvíos, cálculo de horas de déficit por puesto y dimensionamiento óptimo de plantilla adicional cumpliendo restricciones.
+        </div>
+        <div id="strategicInsights"></div>
+      </div>
+      
+      <div class="card span-8">
+        <h2>Incidencias detectadas</h2>
+        <div id="diagnosticsList"></div>
+      </div>
+      <div class="card span-4">
+        <h2>Eficiencia de cobertura</h2>
+        <div id="diagnosticHours"></div>
+      </div>
+    </div>
+  </section>
+  
+  <!-- 🎯 PLANTILLA ÓPTIMA -->
+  <section id="optimizer" class="view">
+    <div class="grid">
+      <!-- KPIs superiores -->
+      <div class="card span-12" style="background:linear-gradient(135deg,rgba(251,191,36,0.08),rgba(99,102,241,0.08)); border-color:rgba(251,191,36,0.25);">
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:6px;">
+          <span style="font-size:28px;">🎯</span>
+          <div>
+            <h2 style="margin:0; color:#fbbf24;">Recomendador de Plantilla Óptima</h2>
+            <div class="kpi">Análisis completo: déficit real, contratos recomendados, coste estimado y simulación de cobertura al 100%.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Config del recomendador -->
+      <div class="card span-4" id="optimizerConfig">
+        <h2>⚙ Parámetros del análisis</h2>
+        <div style="display:grid; gap:14px;">
+          <div>
+            <label>Coste hora bruta (€)</label>
+            <input id="optCostPerHour" type="number" step="0.5" value="9.5" min="0" style="margin-top:6px;">
+            <div class="kpi" style="margin-top:4px;">SMI 2025: ~9,07 €/h · Usa el valor de tu convenio</div>
+          </div>
+          <div>
+            <label>Semanas a proyectar</label>
+            <input id="optWeeks" type="number" min="1" max="52" value="4" style="margin-top:6px;">
+          </div>
+          <div>
+            <label>Estrategia de contratación</label>
+            <select id="optStrategy" style="margin-top:6px;">
+              <option value="balanced">Equilibrada (mix de contratos)</option>
+              <option value="fulltime">Máximo jornadas completas (40h)</option>
+              <option value="parttime">Máximo contratos parciales (flexibilidad)</option>
+              <option value="minstaff">Mínimo de personas posible</option>
+            </select>
+          </div>
+          <div>
+            <label>Tipos de contrato disponibles</label>
+            <div style="display:grid; gap:6px; margin-top:6px;">
+              <label style="display:flex;align-items:center;gap:8px;color:#fff;font-size:13px;"><input type="checkbox" id="optCT_full40" checked> Jornada completa (40h/5 días)</label>
+              <label style="display:flex;align-items:center;gap:8px;color:#fff;font-size:13px;"><input type="checkbox" id="optCT_part30" checked> Parcial 30h (5 días × 6h)</label>
+              <label style="display:flex;align-items:center;gap:8px;color:#fff;font-size:13px;"><input type="checkbox" id="optCT_part20" checked> Parcial 20h (4 días × 5h)</label>
+              <label style="display:flex;align-items:center;gap:8px;color:#fff;font-size:13px;"><input type="checkbox" id="optCT_part16" checked> Parcial 16h (4 días × 4h)</label>
+              <label style="display:flex;align-items:center;gap:8px;color:#fff;font-size:13px;"><input type="checkbox" id="optCT_part12"> Parcial 12h (3 días × 4h)</label>
+            </div>
+          </div>
+          <button class="btn primary" style="width:100%; padding:14px; font-size:15px;" onclick="runOptimizer()">🔍 Analizar y recomendar</button>
+        </div>
+      </div>
+
+      <!-- Resultados del recomendador -->
+      <div class="card span-8" id="optimizerResults">
+        <div class="empty" style="padding:60px 20px;">
+          <div style="font-size:40px;margin-bottom:12px;">🎯</div>
+          <div style="font-size:15px; margin-bottom:8px;">Configura los parámetros y pulsa <strong>Analizar y recomendar</strong></div>
+          <div class="kpi">El motor calculará el déficit real de horas, te propondrá los contratos óptimos y te mostrará el coste estimado de la ampliación.</div>
+        </div>
+      </div>
+
+      <!-- Detalle por turno/puesto -->
+      <div class="card span-12" id="optimizerDetail" style="display:none;">
+        <h2>📋 Déficit detallado por turno, día y puesto</h2>
+        <div id="optimizerDetailContent"></div>
+      </div>
+
+      <!-- Simulación con nueva plantilla -->
+      <div class="card span-12" id="optimizerSimCard" style="display:none;">
+        <h2>🔬 Simulación: cuadrante con plantilla ampliada</h2>
+        <div class="notice" style="margin-bottom:16px; font-size:13px;">Esta simulación añade el personal recomendado a la plantilla actual y recalcula el cuadrante para mostrar la cobertura teórica al 100%.</div>
+        <div id="optimizerSimContent"></div>
+        <div style="margin-top:16px; display:flex; gap:10px; flex-wrap:wrap;">
+          <button class="btn primary" onclick="applyRecommendation()" style="padding:12px 20px;">✅ Aplicar recomendación a la plantilla real</button>
+          <button class="btn" onclick="exportOptimizerCSV()" style="padding:12px 20px;">⬇ Exportar informe CSV</button>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <div class="footer-note">Gestor de Horarios Laboral Compliant v4.1 • Motor ET España · Recomendador de Plantilla Óptima · Coste estimado de contratación</div>
+</div>
+
+<!-- MODAL EDICION -->
+<div class="modal" id="modal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h2 id="modalTitle">Modificar asignación</h2>
+      <button class="btn" style="padding: 6px 12px" onclick="closeModal()">✕</button>
+    </div>
+    <div id="modalContent"></div>
+  </div>
+</div>
+
+<script>
+const DAYS=["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"];
+let data={ workers:[], shifts:[], needs:{}, positions:[], exceptions:[], schedule:[], clockRecords:[], vacations:[] };
+
+function uid(p){return p+Math.random().toString(36).slice(2,9)}
+function save(){
+  // Debounce localStorage writes — no need to write on every keystroke
+  if(save._t) clearTimeout(save._t);
+  save._t = setTimeout(()=>{ localStorage.setItem("gestorHorariosInfalible",JSON.stringify(data)); }, 150);
+}
+// Focused select populators (cheap, DOM-only, no innerHTML rebuild of lists)
+function renderShiftSelects(){
+  const opts = data.shifts.map(s=>`<option value="${s.id}">${esc(s.name)} (${s.start}-${s.end})</option>`).join("");
+  ['eShift','ciShift'].forEach(id=>{ const el=document.getElementById(id); if(el) el.innerHTML=opts; });
+}
+function renderExceptionSelects(){
+  const wOpts = data.workers.map(w=>`<option value="${w.id}">${esc(w.name)}</option>`).join("");
+  const dOpts = DAYS.map((d,i)=>`<option value="${i}">${d}</option>`).join("");
+  const sOpts = data.shifts.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join("");
+  ['eWorker'].forEach(id=>{ const el=document.getElementById(id); if(el) el.innerHTML=wOpts; });
+  ['eDay'].forEach(id=>{ const el=document.getElementById(id); if(el) el.innerHTML=dOpts; });
+  ['eShift'].forEach(id=>{ const el=document.getElementById(id); if(el) el.innerHTML=sOpts; });
+}
+function renderVacationSelects(){
+  const wOpts = data.workers.map(w=>`<option value="${w.id}">${esc(w.name)}</option>`).join("");
+  ['vWorker'].forEach(id=>{ const el=document.getElementById(id); if(el) el.innerHTML=wOpts; });
+}
+function renderClockSelects(){
+  const wOpts = data.workers.map(w=>`<option value="${w.id}">${esc(w.name)}</option>`).join("");
+  ['ciWorker'].forEach(id=>{ const el=document.getElementById(id); if(el) el.innerHTML=wOpts; });
+}
+function renderCoverage(){
+  const box = document.getElementById("coverage");
+  if(!box) return;
+  const assigned=Object.keys(data.schedule).length;
+  const required=Object.values(data.needs).reduce((a,b)=>a+Number(b||0),0);
+  const pct=required?Math.round(assigned/required*100):0;
+  box.innerHTML=`<div class="progress" style="height:12px; margin-bottom:10px; background:rgba(0,0,0,0.3)"><i style="transform:scaleX(${pct/100})"></i></div><div style="text-align:right; font-size:13px; color:var(--muted)">${pct}% Completado</div>`;
+}
+function renderHoursComparison(){
+  const box = document.getElementById("hoursComparisonStats");
+  if(!box) return;
+  const contracted = data.workers.reduce((a,w)=>a+w.hours,0);
+  const assigned = data.workers.reduce((a,w)=>a+getAssignedHours(w.id),0);
+  const diff = assigned - contracted;
+  box.innerHTML=`
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px">
+      <div class="opt-kpi"><strong style="color:var(--accent-1)">${contracted}h</strong><span>Contratadas</span></div>
+      <div class="opt-kpi"><strong style="color:${diff<-0.5?'var(--yellow)':diff>0.5?'var(--red)':'var(--green)'}">${assigned}h</strong><span>Asignadas</span></div>
+    </div>
+    <div class="progress"><i style="transform:scaleX(${contracted>0?Math.min(1,assigned/contracted):0}); background:${diff<0?'var(--yellow)':diff>0?'var(--red)':'var(--green)'}"></i></div>
+    <div class="kpi" style="margin-top:6px; text-align:right">${diff===0?'✅ Perfecto':diff<0?'⚠ Faltan '+ Math.abs(diff)+'h':'⚠ Exceso de '+diff+'h'}</div>`;
+}
+function load(){
+ try{const x=JSON.parse(localStorage.getItem("gestorHorariosInfalible"));if(x)data=x}catch(e){}
+ if(!data.workers)data.workers=[]; if(!data.shifts)data.shifts=[]; if(!data.needs)data.needs={}; if(!data.exceptions)data.exceptions=[]; if(!data.schedule || Array.isArray(data.schedule))data.schedule={}; if(!data.positions)data.positions=[]; if(!data.clockRecords)data.clockRecords=[]; if(!data.vacations)data.vacations=[];
+}
+function esc(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
+function hours(start,end){let [a,b]=start.split(":").map(Number),[c,d]=end.split(":").map(Number);let h=(c*60+d-a*60-b)/60;if(h<=0)h+=24;return h}
+function shiftHours(s){return Number(s.hours)||hours(s.start,s.end)}
+
+document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{
+ document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
+ document.querySelectorAll(".view").forEach(x=>x.classList.remove("active"));
+ b.classList.add("active");
+ _activeTab = b.dataset.tab;
+ document.getElementById(b.dataset.tab).classList.add("active");
+ scheduleRender(true); // immediate on tab switch
+});
+
+function setWorkerMode(mode) {
+  if (mode === 'individual') {
+    document.getElementById('tabModeIndividual').classList.add('active');
+    document.getElementById('tabModeZone').classList.remove('active');
+    document.getElementById('formModeIndividual').style.display = 'block';
+    document.getElementById('formModeZone').style.display = 'none';
+  } else {
+    document.getElementById('tabModeZone').classList.add('active');
+    document.getElementById('tabModeIndividual').classList.remove('active');
+    document.getElementById('formModeIndividual').style.display = 'none';
+    document.getElementById('formModeZone').style.display = 'block';
+  }
+}
+
+function setScheduleSubTab(mode) {
+  if (mode === 'grid') {
+    document.getElementById('subTabGrid').classList.add('active');
+    document.getElementById('subTabPersonal').classList.remove('active');
+    document.getElementById('scheduleGridView').style.display = 'block';
+    document.getElementById('schedulePersonalView').style.display = 'none';
+  } else {
+    document.getElementById('subTabPersonal').classList.add('active');
+    document.getElementById('subTabGrid').classList.remove('active');
+    document.getElementById('scheduleGridView').style.display = 'none';
+    document.getElementById('schedulePersonalView').style.display = 'block';
+    
+    const sel = document.getElementById('scheduleWorkerSelect');
+    const currentVal = sel.value;
+    sel.innerHTML = '<option value="">-- Elige un empleado --</option>' + 
+      data.workers.map(w => `<option value="${w.id}">${esc(w.name)} (${getAssignedHours(w.id)}h)</option>`).join("");
+    if(currentVal) sel.value = currentVal;
+    renderPersonalSchedule();
+  }
+}
+
+function renderPersonalSchedule() {
+  const wid = document.getElementById('scheduleWorkerSelect').value;
+  const resultBox = document.getElementById('personalScheduleResult');
+  if(!wid) {
+    resultBox.innerHTML = '<div class="empty">Selecciona un empleado arriba para ver su horario detallado de la semana.</div>';
+    return;
+  }
+  const worker = data.workers.find(w => w.id === wid);
+  if(!worker) return;
+
+  const assignments = workerAssignments(wid);
+  assignments.sort((a,b) => a.day - b.day);
+
+  let html = `<h3 style="margin-top:0; margin-bottom:12px; color: #a5b4fc;">Horario para: ${esc(worker.name)}</h3>`;
+  html += `<div class="kpi" style="margin-bottom:16px;">Total asignado: <b>${getAssignedHours(wid)}h</b> / Contrato: <b>${worker.hours}h</b>${getExceptionalHours(wid)>0?` · <span style="color:#fbbf24">+${getExceptionalHours(wid)}h de refuerzo</span>`:''}</div>`;
+
+  // Agrupar por día para detectar dobles
+  const byDay = {};
+  assignments.forEach(a=>{ if(!byDay[a.day]) byDay[a.day]=[]; byDay[a.day].push(a); });
+
+  if(assignments.length === 0) {
+    html += '<div class="empty" style="padding:20px;">No tiene turnos asignados para esta semana.</div>';
+  } else {
+    html += '<div style="display: flex; flex-direction: column; gap: 8px;">';
+    Object.keys(byDay).sort((a,b)=>a-b).forEach(dayKey=>{
+      const dayAssignments = byDay[dayKey];
+      const isDouble = dayAssignments.length > 1;
+      const totalDayH = dayAssignments.reduce((sum,a)=>{ const s=data.shifts.find(x=>x.id===a.shift); return sum+(s?shiftHours(s):0); },0);
+      dayAssignments.forEach((a,idx)=>{
+        const shift = data.shifts.find(s => s.id === a.shift);
+        const pos = data.positions.find(p => p.id === a.positionId);
+        html += `
+          <div style="display: flex; justify-content: space-between; align-items: center; background: ${isDouble?'rgba(168,85,247,0.08)':'rgba(255,255,255,0.04)'}; padding: 12px 16px; border-radius: 10px; border: 1px solid ${isDouble?'rgba(168,85,247,0.3)':'var(--glass-border)'};">
+            <div>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <strong style="color: #fff;">${DAYS[a.day]}</strong>
+                ${isDouble?`<span class="badge purple" style="font-size:10px;">🔄 DOBLA${idx===0?' (1/'+dayAssignments.length+')':' (2/'+dayAssignments.length+')'}</span>`:''}
+              </div>
+              <div class="kpi" style="margin-top:2px;">Turno: <b>${esc(shift?.name || "—")}</b> (${shift?.start || ""} - ${shift?.end || ""})</div>
+              ${isDouble&&idx===dayAssignments.length-1?`<div class="kpi" style="color:#d8b4fe; margin-top:2px;">Total día: ${totalDayH}h / 9h máx.</div>`:''}
+            </div>
+            <div>
+              <span class="badge blue">${esc(pos?.name || "Puesto")}</span>
+              <span class="badge ${isDouble?'purple':'green'}" style="margin-left: 6px;">${shift ? shiftHours(shift) : 0}h</span>
+            </div>
+          </div>
+        `;
+      });
+    });
+    html += '</div>';
+  }
+  resultBox.innerHTML = html;
+}
+
+function addWorker(){
+ const name=wName.value.trim(); if(!name)return alert("Introduce un nombre.");
+ const h=Number(wHours.value)||40;
+ if(h>40){alert("Las horas semanales no pueden superar 40 (Art. 34.1 ET). Introduce un máximo de 40h.");return;}
+ const d=Number(wDays.value)||5;
+ if(d>6){alert("El máximo de días por semana es 6 (descanso mínimo 1,5 días — Art. 37.1 ET).");return;}
+ const contractType=document.getElementById("wContractType")?.value||"indefinido";
+ const allowDouble=document.getElementById("wAllowDouble")?.checked||false;
+ data.workers.push({id:uid("w"),name,hours:h,maxDays:d,positionId:wPosition.value,contractType,allowDouble});
+ save();wName.value="";renderWorkers();renderStats();renderStatsWithIcons();
+ if(typeof showToast==='function') showToast(`${name} añadido/a a la plantilla.`,'👤',2500);
+}
+
+function addWorkersByZone(){
+ const posId = wZonePosition.value;
+ const count = Number(wZoneCount.value);
+ const prefix = wZonePrefix.value.trim() || "Trabajador";
+ const hoursVal = Number(wZoneHours.value) || 40;
+ const daysVal = Number(wZoneDays.value) || 5;
+
+ if(!posId) return alert("Selecciona una zona / puesto de trabajo válido.");
+ if(!count || count <= 0) return alert("Introduce una cantidad válida de trabajadores.");
+ if(hoursVal > 40){alert("Las horas semanales no pueden superar 40 (Art. 34.1 ET).");return;}
+ if(daysVal > 6){alert("El máximo de días por semana es 6 (Art. 37.1 ET).");return;}
+
+ const targetPosition = data.positions.find(p => p.id === posId);
+ const zoneName = targetPosition ? targetPosition.name : "Zona";
+
+ let existingCount = data.workers.filter(w => w.name.startsWith(prefix)).length;
+
+ for(let i = 1; i <= count; i++) {
+   existingCount++;
+   const workerName = `${prefix} ${existingCount}`;
+   data.workers.push({
+     id: uid("w"),
+     name: workerName,
+     hours: hoursVal,
+     maxDays: daysVal,
+     positionId: posId,
+     allowDouble: document.getElementById("wZoneAllowDouble")?.checked||false
+   });
+ }
+
+ save();
+ wZonePrefix.value = "";
+ wZoneCount.value = "3";
+ renderWorkers();renderStats();renderStatsWithIcons();
+ if(typeof showToast==='function') showToast(`${count} trabajadores añadidos a ${zoneName}.`,'👥',2500);
+ else alert(`Se han añadido correctamente ${count} trabajadores a la zona de ${zoneName}.`);
+}
+
+function deleteWorker(id){
+ data.workers=data.workers.filter(x=>x.id!==id);
+ data.exceptions=data.exceptions.filter(x=>x.workerId!==id);
+ data.clockRecords=data.clockRecords.filter(x=>x.workerId!==id);
+ data.vacations=data.vacations.filter(x=>x.workerId!==id);
+ Object.keys(data.schedule).forEach(k=>{if(data.schedule[k]===id)delete data.schedule[k]});
+ save();renderWorkers();renderStats();renderStatsWithIcons();scheduleRender();
+}
+
+function editWorker(id){
+ const w = data.workers.find(x => x.id === id);
+ if(!w) return;
+ 
+ document.getElementById("modalTitle").textContent = "Editar Empleado";
+ document.getElementById("modalContent").innerHTML = `
+   <div class="form-grid">
+     <div style="grid-column:span 2"><label>Nombre</label><input id="modalWName" value="${esc(w.name)}"></div>
+     <div><label>Horas / Semana (máx. 40)</label><input id="modalWHours" type="number" min="0" max="40" value="${w.hours}"></div>
+     <div><label>Días máx. / Semana (máx. 6)</label><input id="modalWDays" type="number" min="1" max="6" value="${w.maxDays}" title="Art. 37.1 ET: descanso mínimo 1,5 días/semana"></div>
+     <div style="grid-column:span 2"><label>Puesto principal</label><select id="modalWPosition">
+       ${data.positions.map(p => `<option value="${p.id}" ${p.id === w.positionId ? 'selected' : ''}>${esc(p.name)}</option>`).join("")}
+     </select></div>
+     <div style="grid-column:span 2"><label>Tipo de contrato</label><select id="modalWContractType">
+       <option value="indefinido" ${(w.contractType||'indefinido')==='indefinido'?'selected':''}>Indefinido</option>
+       <option value="temporal" ${w.contractType==='temporal'?'selected':''}>Temporal</option>
+       <option value="parcial" ${w.contractType==='parcial'?'selected':''}>Parcial</option>
+     </select></div>
+     <div style="grid-column:span 2; display:flex; align-items:center; gap:10px; padding:10px 14px; border-radius:10px; background:rgba(99,102,241,0.08); border:1px solid rgba(99,102,241,0.2);">
+       <input type="checkbox" id="modalWAllowDouble" ${w.allowDouble?'checked':''} style="width:16px; height:16px; cursor:pointer;">
+       <label for="modalWAllowDouble" style="margin:0; color:#a5b4fc; font-size:13px; cursor:pointer;"><strong>Puede doblar turno</strong> — dos turnos el mismo día si la suma ≤ 9h</label>
+     </div>
+   </div>
+   <div class="form-actions" style="margin-top:20px">
+     <button class="btn primary" style="flex:1; padding:12px" onclick="saveWorkerEdit('${w.id}')">Guardar cambios</button>
+   </div>
+ `;
+ document.getElementById("modal").classList.add("show");
+}
+
+function saveWorkerEdit(id){
+ const w = data.workers.find(x => x.id === id);
+ if(!w) return;
+ const name = document.getElementById("modalWName").value.trim();
+ if(!name) return alert("El nombre no puede estar vacío.");
+
+ const newHours = Number(document.getElementById("modalWHours").value) || 40;
+ const newDays = Number(document.getElementById("modalWDays").value) || 5;
+ if(newHours > 40){alert("Las horas semanales no pueden superar 40 (Art. 34.1 ET).");return;}
+ if(newDays > 6){alert("El máximo de días por semana es 6 (Art. 37.1 ET).");return;}
+ w.name = name;
+ w.hours = newHours;
+ w.maxDays = newDays;
+ w.positionId = document.getElementById("modalWPosition").value;
+ w.contractType = document.getElementById("modalWContractType")?.value || w.contractType || "indefinido";
+ w.allowDouble  = document.getElementById("modalWAllowDouble")?.checked || false;
+
+ save();
+ closeModal();renderWorkers();renderStats();
+}
+
+function calcShiftHours(){
+ const h = hours(sStart.value, sEnd.value);
+ sHours.value = h;
+ const warn = document.getElementById("shiftLegalWarning");
+ if(!warn) return;
+ if(h > LABOR_RULES.dailyOrdinaryMax){
+   warn.style.display = "block";
+   warn.innerHTML = `⚠ Este turno supera las <b>${LABOR_RULES.dailyOrdinaryMax}h ordinarias/día</b> permitidas (Art. 34.3 ET). No podrá usarse en el cuadrante automático.`;
+ } else {
+   warn.style.display = "none";
+ }
+}
+function saveShift(){
+ const name=sName.value.trim(); if(!name)return alert("Introduce un nombre.");
+ const id = sEditId.value;
+ const h = Number(sHours.value) || hours(sStart.value, sEnd.value);
+ 
+ if(id){
+   const sh = data.shifts.find(x=>x.id===id);
+   if(sh){ sh.name = name; sh.start = sStart.value; sh.end = sEnd.value; sh.hours = h; }
+ } else {
+   data.shifts.push({id:uid("s"),name,start:sStart.value,end:sEnd.value,hours:h});
+ }
+ data.shifts.forEach(s=>{DAYS.forEach((_,d)=>{const k=d+"_"+s.id;if(data.needs[k]==null)data.needs[k]=0})});
+ save();resetShiftForm();scheduleRender();
+}
+function editShift(id){
+ const s = data.shifts.find(x=>x.id===id);
+ if(!s)return;
+ sEditId.value = s.id; sName.value = s.name; sStart.value = s.start; sEnd.value = s.end; sHours.value = shiftHours(s);
+ shiftFormTitle.textContent = "Editar Turno"; sCancelBtn.style.display = "inline-block";
+}
+function resetShiftForm(){
+ sEditId.value = ""; sName.value = ""; sStart.value = "09:00"; sEnd.value = "17:00"; calcShiftHours();
+ shiftFormTitle.textContent = "Configurar turno"; sCancelBtn.style.display = "none";
+}
+function deleteShift(id){
+ data.shifts=data.shifts.filter(x=>x.id!==id);
+ Object.keys(data.needs).forEach(k=>{if(k.endsWith("_"+id))delete data.needs[k]});
+ data.exceptions=data.exceptions.filter(x=>x.shiftId!==id);
+ save();scheduleRender();
+}
+
+function addException(){
+ if(!eWorker.value||!eShift.value)return alert("Necesitas trabajadores y turnos.");
+ data.exceptions.push({id:uid("e"),workerId:eWorker.value,day:Number(eDay.value),shiftId:eShift.value,type:eType.value});
+ save();scheduleRender();
+}
+function deleteException(id){data.exceptions=data.exceptions.filter(x=>x.id!==id);save();render()}
+
+function addClockRecord(){
+ const workerId = ciWorker.value;
+ const date = ciDate.value;
+ const type = ciType.value;
+ const time = ciTime.value;
+
+ if(!workerId || !date || !time) return alert("Por favor, completa todos los campos del fichaje.");
+ data.clockRecords.push({ id: uid("ci"), workerId, date, type, time });
+ save();scheduleRender();
+}
+function deleteClockRecord(id){
+ data.clockRecords = data.clockRecords.filter(x => x.id !== id);
+ save();scheduleRender();
+}
+
+function addVacation(){
+ const workerId = vWorker.value;
+ const start = vStart.value;
+ const end = vEnd.value;
+ const reason = vReason.value.trim() || "Vacaciones";
+
+ if(!workerId || !start || !end) return alert("Introduce el empleado y las fechas de inicio y fin.");
+ if(start > end) return alert("La fecha de inicio no puede ser posterior a la fecha de fin.");
+
+ data.vacations.push({ id: uid("v"), workerId, start, end, reason });
+ save();scheduleRender();
+ alert("Periodo vacacional registrado con éxito.");
+}
+function deleteVacation(id){
+ data.vacations = data.vacations.filter(x => x.id !== id);
+ save();scheduleRender();
+}
+
+// ── SMART RENDER: only update what's visible + shared bits ──────────────────
+// Each tab maps to the render functions it needs.
+const TAB_RENDERERS = {
+  dashboard:   ['renderStats','renderHours','renderCoverage','renderHoursComparison'],
+  shifts:      ['renderShifts','renderShiftSelects'],
+  needs:       ['renderPositions','renderNeeds','renderPositionSelect'],
+  workers:     ['renderWorkers','renderPositionSelect'],
+  exceptions:  ['renderExceptions','renderExceptionSelects'],
+  vacations:   ['renderVacations','renderVacationSelects'],
+  schedule:    ['renderSchedule'],
+  clockin:     ['renderClockIn','renderClockSummary','renderClockSelects'],
+  diagnostics: ['renderDiagnostics'],
+  compliance:  ['renderCompliance'],
+  optimizer:   [],  // rendered on demand by runOptimizer
+};
+
+// Track which tab is active
+let _activeTab = 'dashboard';
+
+// Dirty flags per render function — set when data changes, cleared after render
+const _dirty = {};
+function markDirty(...fns){ fns.forEach(f => _dirty[f] = true); }
+function markAllDirty(){ Object.keys(_dirty).forEach(k => _dirty[k] = true); Object.keys(TAB_RENDERERS).forEach(t => TAB_RENDERERS[t].forEach(f => _dirty[f] = true)); }
+
+// Debounce render calls
+let _renderTimer = null;
+function scheduleRender(immediate=false){
+  if(_renderTimer) cancelAnimationFrame(_renderTimer);
+  if(immediate){ _doRender(); return; }
+  _renderTimer = requestAnimationFrame(_doRender);
+}
+
+function _doRender(){
+  _renderTimer = null;
+  // Always render stats bar (it's tiny)
+  renderStats();
+  renderStatsWithIcons();
+  // Only render functions needed by the current active tab
+  const fns = TAB_RENDERERS[_activeTab] || [];
+  fns.forEach(fn => {
+    if(typeof window[fn] === 'function') window[fn]();
+  });
+  // Mark all as clean
+  markAllDirty(); // reset — we've just rendered
+}
+
+// Legacy render() now just schedules a smart render
+function render(immediate=false){ markAllDirty(); scheduleRender(immediate); }
+function renderStats(){
+ const assigned=Object.keys(data.schedule).length;
+ const required=Object.values(data.needs).reduce((a,b)=>a+Number(b||0),0);
+ const pct=required?Math.round(assigned/required*100):0;
+ const contracted=data.workers.reduce((a,w)=>a+w.hours,0);
+ const assignedH=data.workers.reduce((a,w)=>a+getAssignedHours(w.id),0);
+ const doublers=data.workers.filter(x=>x.allowDouble).length;
+ const statsEl=document.getElementById("stats");
+ if(!statsEl) return;
+ statsEl.innerHTML=`
+  <div class="stat"><span class="stat-icon">👥</span><strong>${data.workers.length}</strong><span>Trabajadores</span></div>
+  <div class="stat"><span class="stat-icon">🕐</span><strong>${data.shifts.length}</strong><span>Turnos</span></div>
+  <div class="stat"><span class="stat-icon">📋</span><strong>${data.positions.length}</strong><span>Puestos</span></div>
+  <div class="stat"><span class="stat-icon">✅</span><strong>${pct}%</strong><span>Cobertura</span></div>
+  <div class="stat"><span class="stat-icon">⏱</span><strong>${assignedH}h</strong><span>Asignadas</span></div>
+  <div class="stat"><span class="stat-icon">📄</span><strong>${contracted}h</strong><span>Contratadas</span></div>
+  ${doublers>0?`<div class="stat"><span class="stat-icon">🔄</span><strong>${doublers}</strong><span>Doblan turno</span></div>`:''}
+ `;
+}
+function renderPositionSelect(){
+ const sel=document.getElementById("wPosition");
+ const zoneSel=document.getElementById("wZonePosition");
+ if(sel){ sel.innerHTML=data.positions.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join(""); }
+ if(zoneSel){ zoneSel.innerHTML=data.positions.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join(""); }
+}
+function renderWorkers(){
+ renderPositionSelect();
+ const box=document.getElementById("workersList");
+ if(!data.workers.length){box.innerHTML='<div class="empty">No hay empleados registrados.</div>';return}
+ box.innerHTML=data.workers.map(w=>{
+   const assigned=getAssignedHours(w.id);
+   const pct=w.hours?Math.round(assigned/w.hours*100):0;
+   const cls=assigned===w.hours?"hours-ok":assigned<w.hours?"hours-low":"hours-over";
+   const contractBadge=w.contractType==="temporal"?`<span class="badge yellow" style="font-size:11px">Temporal</span>`:w.contractType==="parcial"?`<span class="badge blue" style="font-size:11px">Parcial</span>`:`<span class="badge green" style="font-size:11px">Indefinido</span>`;
+   const doubleBadge=w.allowDouble?`<span class="badge purple" style="font-size:11px">🔄 Dobla</span>`:``;
+   return `
+ <div class="worker-card">
+  <div style="flex:1">
+    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+      <strong>${esc(w.name)}</strong>${contractBadge}${doubleBadge}
+    </div>
+    <div class="kpi" style="margin-top:3px;">${esc(data.positions.find(p=>p.id===w.positionId)?.name||"Sin rol")} • ${w.hours}h contrato • ${w.maxDays} días máx.</div>
+    <div style="display:flex; align-items:center; gap:10px; margin-top:6px;">
+      <div class="progress" style="flex:1; height:5px;"><i style="transform:scaleX(calc(${Math.min(100,pct)} / 100)); background:${assigned>w.hours?'var(--red)':assigned===w.hours?'var(--green)':'var(--yellow)'}"></i></div>
+      <span class="hours-badge ${cls}">${assigned}/${w.hours}h</span>
+    </div>
+  </div>
+  <div style="display:flex; gap:8px; margin-left:12px;">
+    <button class="btn" style="padding:6px 12px; font-size:13px;" onclick="editWorker('${w.id}')">Editar</button>
+    <button class="btn danger" style="padding:6px 12px; font-size:13px;" onclick="deleteWorker('${w.id}')">Eliminar</button>
+  </div>
+ </div>`}).join("");
+}
+function renderShifts(){
+ const box=document.getElementById("shiftsList");
+ if(!data.shifts.length){box.innerHTML='<div class="empty">No hay turnos creados.</div>';return}
+ box.innerHTML=`<div class="table-wrap"><table><thead><tr><th>Turno</th><th>Franja</th><th>Horas</th><th style="text-align:right">Acciones</th></tr></thead><tbody>`+
+ data.shifts.map(s=>`<tr><td><strong>${esc(s.name)}</strong></td><td>${s.start} - ${s.end}</td><td><span class="badge">${shiftHours(s)} h</span></td><td style="text-align:right"><button class="btn" style="padding:4px 10px; margin-right:6px" onclick="editShift('${s.id}')">Editar</button><button class="btn danger" style="padding:4px 10px" onclick="deleteShift('${s.id}')">Eliminar</button></td></tr>`).join("")+
+ `</tbody></table></div>`;
+}
+function addPosition(){
+ const name=pName.value.trim();
+ if(!name)return alert("Introduce el nombre.");
+ if(data.positions.some(x=>x.name.toLowerCase()===name.toLowerCase()))return alert("El puesto ya existe.");
+ data.positions.push({id:uid("p"),name});
+ pName.value=""; save();scheduleRender();
+}
+function deletePosition(id){
+ data.positions=data.positions.filter(x=>x.id!==id);
+ Object.keys(data.needs).forEach(k=>{if(k.endsWith("_"+id))delete data.needs[k]});
+ data.workers.forEach(w=>{if(w.positionId===id)w.positionId=""});
+ save();scheduleRender();
+}
+function renderPositions(){
+ const box=document.getElementById("positionsList");
+ if(!box)return;
+ if(!data.positions.length){box.innerHTML='<div class="empty">Sin roles.</div>';return}
+ box.innerHTML=data.positions.map(p=>`
+ <div class="worker-card" style="padding:10px 16px">
+   <strong>${esc(p.name)}</strong>
+   <button class="btn danger" style="padding:6px 12px; font-size:12px" onclick="deletePosition('${p.id}')">Borrar</button>
+ </div>`).join("");
+}
+function renderNeeds(){
+ renderPositions();
+ const box=document.getElementById("needsTable");
+ if(!data.shifts.length) return box.innerHTML='<div class="empty">Crea primero los turnos.</div>';
+ if(!data.positions.length) return box.innerHTML='<div class="empty">Crea primero al menos un rol de trabajo.</div>';
+ 
+ let h='<div class="table-wrap"><table><thead><tr><th>Día y Turno</th>'+
+   data.positions.map(p=>`<th>${esc(p.name)}</th>`).join("")+
+   '<th>Total req.</th></tr></thead><tbody>';
+ DAYS.forEach((d,i)=>{
+   data.shifts.forEach(s=>{
+     let total=0;
+     const inputs=data.positions.map(p=>{
+       const k=i+"_"+s.id+"_"+p.id;
+       const value=Number(data.needs[k]||0); total+=value;
+       return `<td><input type="number" min="0" max="30" value="${value}" onchange="setNeed('${k}',this.value)" style="width:60px; text-align:center"></td>`;
+     }).join("");
+     h+=`<tr><td><strong>${d}</strong><div class="kpi">${esc(s.name)} (${s.start}-${s.end})</div></td>${inputs}<td><span class="badge ${total>0?'green':''}">${total}</span></td></tr>`;
+   });
+ });
+ box.innerHTML=h+'</tbody></table></div>';
+}
+function setNeed(k,v){data.needs[k]=Math.max(0,Number(v)||0);save();renderStats();renderSchedule()}
+
+function renderExceptions(){
+ const ew=document.getElementById("eWorker"),ed=document.getElementById("eDay"),es=document.getElementById("eShift");
+ ew.innerHTML=data.workers.map(w=>`<option value="${w.id}">${esc(w.name)}</option>`).join("");
+ ed.innerHTML=DAYS.map((d,i)=>`<option value="${i}">${d}</option>`).join("");
+ es.innerHTML=data.shifts.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join("");
+ const box=document.getElementById("exceptionsList");
+ if(!data.exceptions.length){box.innerHTML='<div class="empty">Sin restricciones.</div>';return}
+ box.innerHTML=data.exceptions.map(e=>{
+  const w=data.workers.find(x=>x.id===e.workerId),s=data.shifts.find(x=>x.id===e.shiftId);
+  return `<div class="worker-card"><div><strong>${esc(w?.name||"Desconocido")}</strong><div class="kpi">${DAYS[e.day]} • Turno: ${esc(s?.name||"—")}</div></div>
+  <div><span class="badge ${e.type==="unavailable"?"red":"yellow"}" style="margin-right:10px">${e.type==="unavailable"?"Bloqueado":"Preferencia"}</span>
+  <button class="btn danger" onclick="deleteException('${e.id}')">✕</button></div></div>`;
+ }).join("");
+}
+
+function renderClockIn(){
+ const cw = document.getElementById("ciWorker");
+ const cd = document.getElementById("ciDate");
+ const ct = document.getElementById("ciTime");
+ if(cw) cw.innerHTML = data.workers.map(w => `<option value="${w.id}">${esc(w.name)}</option>`).join("");
+ if(cd && !cd.value) cd.value = new Date().toISOString().split("T")[0];
+ if(ct && !ct.value) ct.value = new Date().toTimeString().slice(0,5);
+
+ const box = document.getElementById("clockRecordsList");
+ if(!box) return;
+ if(!data.clockRecords.length){ box.innerHTML = '<div class="empty">No hay registros de fichaje aún.</div>'; return; }
+
+ box.innerHTML = `<div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Empleado</th><th>Tipo</th><th>Hora</th><th style="text-align:right">Acción</th></tr></thead><tbody>` +
+   data.clockRecords.map(r => {
+     const w = data.workers.find(x => x.id === r.workerId);
+     const badgeClass = r.type === 'in' ? 'green' : 'blue';
+     const typeText = r.type === 'in' ? 'Entrada' : 'Salida';
+     return `<tr><td>${r.date}</td><td><strong>${esc(w?.name || "Desconocido")}</strong></td><td><span class="badge ${badgeClass}">${typeText}</span></td><td>${r.time}</td><td style="text-align:right"><button class="btn danger" style="padding:4px 10px" onclick="deleteClockRecord('${r.id}')">Borrar</button></td></tr>`;
+   }).join("") +
+   `</tbody></table></div>`;
+}
+
+function renderVacations(){
+ const vw = document.getElementById("vWorker");
+ if(vw) vw.innerHTML = data.workers.map(w => `<option value="${w.id}">${esc(w.name)}</option>`).join("");
+
+ const box = document.getElementById("vacationsList");
+ if(!box) return;
+ if(!data.vacations.length){ box.innerHTML = '<div class="empty">No hay vacaciones o permisos registrados.</div>'; return; }
+
+ box.innerHTML = data.vacations.map(v => {
+   const w = data.workers.find(x => x.id === v.workerId);
+   return `<div class="worker-card"><div><strong>${esc(w?.name || "Desconocido")}</strong><div class="kpi">Del ${v.start} al ${v.end} • <b>${esc(v.reason)}</b></div></div><button class="btn danger" onclick="deleteVacation('${v.id}')">Eliminar</button></div>`;
+ }).join("");
+}
+
+function isWorkerOnVacation(wid, dateStr){
+ if(!dateStr) return false;
+ return data.vacations.some(v => v.workerId === wid && dateStr >= v.start && dateStr <= v.end);
+}
+
+function unavailable(wid,day,sid){
+ return data.exceptions.some(e=>e.workerId===wid&&e.day===day&&e.shiftId===sid&&e.type==="unavailable");
+}
+function preferred(wid,day,sid){return data.exceptions.some(e=>e.workerId===wid&&e.day===day&&e.shiftId===sid&&e.type==="preferred");}
+function overlap(a,b){
+ const sa=data.shifts.find(s=>s.id===a), sb=data.shifts.find(s=>s.id===b); if(!sa||!sb)return false;
+ const toMin=t=>{let [h,m]=t.split(":").map(Number);return h*60+m}
+ let a1=toMin(sa.start),a2=toMin(sa.end);let b1=toMin(sb.start),b2=toMin(sb.end);
+ if(a2<=a1)a2+=1440;if(b2<=b1)b2+=1440;
+ return Math.max(a1,b1)<Math.min(a2,b2);
+}
+function workerAssignments(wid){
+ return Object.entries(data.schedule).filter(([k,v])=>v===wid).map(([k])=>{
+   let [d,s,p,i]=k.split("_"); return {day:Number(d),shift:s,positionId:p};
+ });
+}
+function toMinutes(t){const [h,m]=t.split(":").map(Number);return h*60+m}
+function hasAdjacentRestViolation(wid,day,shiftId,schedule=data.schedule){
+ const current=data.shifts.find(s=>s.id===shiftId);
+ if(!current)return false;
+ const currentStart=toMinutes(current.start);
+ for(const [k,v] of Object.entries(schedule)){
+   if(v!==wid)continue;
+   const parts=k.split("_"), d=Number(parts[0]), sid=parts[1];
+   const other=data.shifts.find(s=>s.id===sid);
+   if(!other)continue;
+   if(Math.abs(d-day)===1){
+     const otherEnd=toMinutes(other.end);
+     const end=otherEnd<=toMinutes(other.start)?otherEnd+1440:otherEnd;
+     const start=currentStart+(currentStart<360?1440:0);
+     if(d===day-1 && end>=(start-11*60))return true;
+   }
+ }
+ return false;
+}
+const LABOR_RULES = {
+ weeklyAbsoluteMax: 40,           // Art. 34.1 ET: máximo 40h ordinarias/semana
+ dailyOrdinaryMax: 9,             // Art. 34.3 ET: máximo 9h ordinarias/día
+ minimumDailyRestHours: 12,       // Art. 34.3 ET: mínimo 12h descanso entre jornadas
+ minimumWeeklyRestDays: 1.5,      // Art. 37.1 ET: mínimo 1,5 días descanso semanal → max 5,5 días → práctico: max 5 turnos distintos
+ maxWorkingDaysPerWeek: 6,        // Días máximos trabajables (1 día + medio libre)
+ overflowByContract: { 30: 35, 20: 30 }
+};
+
+function contractedTarget(w){
+ return Math.min(Number(w?.hours)||0, LABOR_RULES.weeklyAbsoluteMax);
+}
+
+function exceptionalWeeklyMax(w){
+ const contract=contractedTarget(w);
+ return LABOR_RULES.overflowByContract[contract] || contract;
+}
+
+function getWorkerWeeklyLimit(w,allowExceptional=false){
+ return allowExceptional ? exceptionalWeeklyMax(w) : contractedTarget(w);
+}
+
+function assignmentEntries(wid,schedule=data.schedule){
+ return Object.entries(schedule).filter(([k,v])=>v===wid).map(([k])=>{
+   const [day,shift,positionId,index]=k.split("_");
+   return {key:k,day:Number(day),shift,positionId,index};
+ });
+}
+
+function getAssignedHours(wid,schedule=data.schedule){
+ return assignmentEntries(wid,schedule).reduce((total,a)=>{
+   const s=data.shifts.find(x=>x.id===a.shift);
+   return total+(s?shiftHours(s):0);
+ },0);
+}
+
+function getAssignedDays(wid,schedule=data.schedule){
+ return new Set(assignmentEntries(wid,schedule).map(a=>a.day));
+}
+
+function getDailyAssignedHours(wid,day,schedule=data.schedule,ignoreKey=null){
+ return assignmentEntries(wid,schedule).filter(a=>a.day===day&&a.key!==ignoreKey).reduce((total,a)=>{
+   const s=data.shifts.find(x=>x.id===a.shift);
+   return total+(s?shiftHours(s):0);
+ },0);
+}
+
+function countAssigned(day,shift,pos){
+ return Object.keys(data.schedule).filter(k=>k.startsWith(`${day}_${shift}_${pos}_`)).length;
+}
+
+function shiftEndAbsoluteMinutes(shift){
+ let start=toMinutes(shift.start), end=toMinutes(shift.end);
+ if(end<=start) end+=1440;
+ return end;
+}
+
+function unavailable(wid,day,sid){
+ return data.exceptions.some(e=>e.workerId===wid&&e.day===day&&e.shiftId===sid&&e.type==="unavailable");
+}
+function preferred(wid,day,sid){
+ return data.exceptions.some(e=>e.workerId===wid&&e.day===day&&e.shiftId===sid&&e.type==="preferred");
+}
+function overlap(a,b){
+ const sa=data.shifts.find(s=>s.id===a), sb=data.shifts.find(s=>s.id===b);
+ if(!sa||!sb)return false;
+ const a1=toMinutes(sa.start),a2=shiftEndAbsoluteMinutes(sa);
+ const b1=toMinutes(sb.start),b2=shiftEndAbsoluteMinutes(sb);
+ return Math.max(a1,b1)<Math.min(a2,b2);
+}
+
+function violatesRest(wid,day,sid,schedule=data.schedule,ignoreKey=null){
+ const current=data.shifts.find(s=>s.id===sid);
+ if(!current)return true;
+ const curStart=toMinutes(current.start);
+ const curEnd=shiftEndAbsoluteMinutes(current);
+ const minRest=LABOR_RULES.minimumDailyRestHours*60;
+
+ for(const a of assignmentEntries(wid,schedule)){
+   if(a.key===ignoreKey)continue;
+   const other=data.shifts.find(s=>s.id===a.shift);
+   if(!other)continue;
+   const otherStart=toMinutes(other.start);
+   const otherEnd=shiftEndAbsoluteMinutes(other);
+
+   if(a.day===day){
+     // Mismo día: sólo bloqueamos si los turnos se solapan (la suma de horas
+     // se controla en canAssign con el límite dailyOrdinaryMax).
+     // "Doblar" (partido o seguido) está permitido mientras no haya solapamiento
+     // y las horas diarias totales no superen 9h.
+     if(Math.max(curStart,otherStart)<Math.min(curEnd,otherEnd))return true; // solapamiento → prohibido
+     // No añadimos más restricciones intra-día: el control de horas lo hace getDailyAssignedHours
+   }
+   // Entre días distintos: exigimos 12h de descanso
+   if(a.day===day-1 && curStart+1440-otherEnd<minRest)return true;
+   if(a.day===day+1 && otherStart+1440-curEnd<minRest)return true;
+ }
+ return false;
+}
+
+function canAssign(w,day,sid,ignoreKey=null,schedule=data.schedule,allowExceptional=false){
+ if(!w)return false;
+ const sh=data.shifts.find(s=>s.id===sid);
+ if(!sh||shiftHours(sh)>LABOR_RULES.dailyOrdinaryMax)return false;
+ if(unavailable(w.id,day,sid))return false;
+
+ const as=assignmentEntries(w.id,schedule).filter(a=>a.key!==ignoreKey);
+
+ // Solapamiento en el mismo día → siempre prohibido
+ if(as.some(a=>a.day===day&&overlap(a.shift,sid)))return false;
+
+ // Horas diarias: la suma de TODOS los turnos del día no puede superar 9h
+ const daily=getDailyAssignedHours(w.id,day,schedule,ignoreKey);
+ if(daily+shiftHours(sh)>LABOR_RULES.dailyOrdinaryMax+0.001)return false;
+
+ // Si ya tiene turno ese día y va a doblar, comprobamos que el trabajador lo permite
+ const alreadyWorksToday = as.some(a=>a.day===day);
+ if(alreadyWorksToday && !w.allowDouble) return false;
+
+ // Límite semanal de horas
+ const limit=getWorkerWeeklyLimit(w,allowExceptional);
+ if(getAssignedHours(w.id,schedule)+shiftHours(sh)>limit+0.001)return false;
+
+ // Límite de días distintos (no cuenta doblar como día extra)
+ if(!alreadyWorksToday && new Set(as.map(a=>a.day)).size>=w.maxDays)return false;
+
+ // Descanso inter-jornada (entre días distintos)
+ if(violatesRest(w.id,day,sid,schedule,ignoreKey))return false;
+ return true;
+}
+
+function canAssignAdvanced(w,slot,schedule,allowExceptional=false){
+ return !!w&&w.positionId===slot.positionId&&canAssign(w,slot.day,slot.shift,null,schedule,allowExceptional);
+}
+
+function candidatePenalty(w,slot,schedule,allowExceptional=false){
+ const sh=data.shifts.find(s=>s.id===slot.shift);
+ if(!sh)return 99999;
+ const assigned=getAssignedHours(w.id,schedule);
+ const contract=contractedTarget(w);
+ const remaining=contract-assigned;
+ let penalty=0;
+
+ // La cobertura de las horas contratadas tiene prioridad absoluta.
+ if(remaining>=shiftHours(sh))penalty-=1000;
+ else if(remaining>0)penalty-=300;
+ else penalty+=allowExceptional?300:5000;
+
+ const days=getAssignedDays(w.id,schedule);
+ const alreadyWorksToday=assignmentEntries(w.id,schedule).some(a=>a.day===slot.day);
+ if(!days.has(slot.day))penalty-=10; else penalty+=5;
+ // Penalizar doblar: sólo si el trabajador lo permite, y con coste moderado
+ // para que el motor prefiera repartir entre personas distintas primero
+ if(alreadyWorksToday) penalty+=80;
+ if(preferred(w.id,slot.day,slot.shift))penalty-=40;
+
+ // En la fase excepcional, minimizar las horas adicionales.
+ if(allowExceptional&&assigned>=contract){
+   penalty+=(assigned+shiftHours(sh)-contract)*25;
+ }
+ return penalty;
+}
+
+function isExceptionalAssignment(wid,key,schedule=data.schedule){
+ const w=data.workers.find(x=>x.id===wid);
+ if(!w)return false;
+ const contract=contractedTarget(w);
+ const before=Object.entries(schedule).filter(([k,v])=>v===wid&&k!==key).reduce((sum,[k])=>{
+   const s=data.shifts.find(x=>x.id===k.split("_")[1]);
+   return sum+(s?shiftHours(s):0);
+ },0);
+ return before>=contract-0.001;
+}
+
+function getExceptionalHours(wid,schedule=data.schedule){
+ const w=data.workers.find(x=>x.id===wid);
+ return w?Math.max(0,getAssignedHours(wid,schedule)-contractedTarget(w)):0;
+}
+
+function generateSchedule(){
+ data.schedule={};
+ let slots=[];
+
+ const invalid=data.shifts.filter(s=>shiftHours(s)>LABOR_RULES.dailyOrdinaryMax);
+ if(invalid.length){
+   alert(`No se pueden generar horarios con turnos de más de ${LABOR_RULES.dailyOrdinaryMax} horas: ${invalid.map(s=>s.name).join(", ")}.`);
+   return;
+ }
+
+ DAYS.forEach((_,day)=>data.shifts.forEach(s=>data.positions.forEach(pos=>{
+   const n=Number(data.needs[day+"_"+s.id+"_"+pos.id]||0);
+   for(let i=0;i<n;i++)slots.push({day,shift:s.id,positionId:pos.id});
+ })));
+
+ // Los huecos con menos candidatos se intentan cubrir primero.
+ slots.sort(()=>Math.random()-0.5);
+ slots.sort((a,b)=>{
+   const ca=data.workers.filter(w=>canAssignAdvanced(w,a,data.schedule,false)).length;
+   const cb=data.workers.filter(w=>canAssignAdvanced(w,b,data.schedule,false)).length;
+   return ca-cb;
+ });
+
+ // FASE 1: nunca superar las horas contratadas.
+ for(const slot of slots){
+   const candidates=data.workers.filter(w=>canAssignAdvanced(w,slot,data.schedule,false))
+    .map(w=>({worker:w,score:candidatePenalty(w,slot,data.schedule,false)+Math.random()*2}))
+    .sort((a,b)=>a.score-b.score);
+
+   if(candidates.length){
+     const chosen=candidates[0].worker;
+     const idx=countAssigned(slot.day,slot.shift,slot.positionId);
+     data.schedule[`${slot.day}_${slot.shift}_${slot.positionId}_${idx}`]=chosen.id;
+   }
+ }
+
+ // FASE 2: REPARACIÓN OBLIGATORIA DE CONTRATOS.
+ // Antes de ampliar jornadas o recomendar nuevas contrataciones, intentamos
+ // recolocar turnos para que todos los trabajadores alcancen sus horas contratadas.
+ // Se repite varias veces porque mover un turno puede desbloquear otro trabajador.
+ for(let pass=0; pass<Math.max(10, data.workers.length*4); pass++){
+   let changed=false;
+   const under=data.workers
+     .map(w=>({w, missing:contractedTarget(w)-getAssignedHours(w.id,data.schedule)}))
+     .filter(x=>x.missing>0.01)
+     .sort((a,b)=>b.missing-a.missing);
+
+   if(!under.length)break;
+
+   for(const {w,missing} of under){
+     if(missing<=0.01)continue;
+
+     // Primero buscamos vacantes reales que este trabajador pueda cubrir.
+     const vacant=slots.filter(slot=>{
+       const req=Number(data.needs[slot.day+"_"+slot.shift+"_"+slot.positionId]||0);
+       return countAssigned(slot.day,slot.shift,slot.positionId)<req &&
+              canAssignAdvanced(w,slot,data.schedule,false);
+     }).sort((a,b)=>{
+       const ah=shiftHours(data.shifts.find(s=>s.id===a.shift));
+       const bh=shiftHours(data.shifts.find(s=>s.id===b.shift));
+       return Math.abs(missing-ah)-Math.abs(missing-bh);
+     });
+
+     if(vacant.length){
+       const slot=vacant[0];
+       const idx=countAssigned(slot.day,slot.shift,slot.positionId);
+       data.schedule[`${slot.day}_${slot.shift}_${slot.positionId}_${idx}`]=w.id;
+       changed=true;
+       continue;
+     }
+
+     // Si no hay vacantes, intentamos sustituir a un trabajador que tenga
+     // horas por encima de contrato. Nunca dejamos voluntariamente por debajo
+     // de contrato al trabajador sustituido.
+     const candidates=[];
+     for(const [key,assignedWid] of Object.entries(data.schedule)){
+       if(assignedWid===w.id)continue;
+       const parts=key.split("_");
+       const slot={day:Number(parts[0]),shift:parts[1],positionId:parts[2]};
+       const donor=data.workers.find(x=>x.id===assignedWid);
+       if(!donor)continue;
+       const donorHours=getAssignedHours(donor.id,data.schedule);
+       const sh=data.shifts.find(x=>x.id===slot.shift);
+       const shh=sh?shiftHours(sh):0;
+       if(donorHours-shh < contractedTarget(donor)-0.01)continue;
+       if(!canAssignAdvanced(w,slot,data.schedule,false))continue;
+       candidates.push({key,slot,donor,excess:donorHours-contractedTarget(donor),fit:Math.abs(missing-shh)});
+     }
+
+     candidates.sort((a,b)=>b.excess-a.excess || a.fit-b.fit);
+     if(candidates.length){
+       const c=candidates[0];
+       data.schedule[c.key]=w.id;
+       changed=true;
+     }
+   }
+
+   if(!changed)break;
+ }
+
+ // FASE 3: solo después de intentar cumplir TODOS los contratos,
+ // usar ampliaciones excepcionales 30->35 y 20->30 para cubrir vacantes.
+ for(const slot of slots){
+   const required=Number(data.needs[slot.day+"_"+slot.shift+"_"+slot.positionId]||0);
+   if(countAssigned(slot.day,slot.shift,slot.positionId)>=required)continue;
+
+   const candidates=data.workers
+    .filter(w=>exceptionalWeeklyMax(w)>contractedTarget(w))
+    .filter(w=>getAssignedHours(w.id,data.schedule)>=contractedTarget(w)-0.001)
+    .filter(w=>canAssignAdvanced(w,slot,data.schedule,true))
+    .map(w=>({worker:w,score:candidatePenalty(w,slot,data.schedule,true)+Math.random()*2}))
+    .sort((a,b)=>a.score-b.score);
+
+   if(candidates.length){
+     const chosen=candidates[0].worker;
+     const idx=countAssigned(slot.day,slot.shift,slot.positionId);
+     data.schedule[`${slot.day}_${slot.shift}_${slot.positionId}_${idx}`]=chosen.id;
+   }
+ }
+
+ save();scheduleRender();
+ document.querySelector('[data-tab="schedule"]').click();
+ const uncovered = Object.keys(data.needs).reduce((a,k)=>a+Math.max(0,Number(data.needs[k]||0)-Object.keys(data.schedule).filter(s=>s.startsWith(k.split('_').slice(0,3).join('_')+'_')).length),0);
+ if(typeof showToast==='function'){
+   if(uncovered===0) showToast('Cuadrante generado. Cobertura al 100%.','⚡',3500);
+   else showToast(`Cuadrante generado. ${uncovered} hueco(s) sin cubrir.`,'⚠️',4000);
+ }
+}
+
+function renderDiagnostics(){
+ const box=document.getElementById("diagnosticsList");
+ const hoursBox=document.getElementById("diagnosticHours");
+ const insightsBox=document.getElementById("strategicInsights");
+ const comparisonBox=document.getElementById("hoursComparisonStats");
+ if(!box || !insightsBox || !comparisonBox) return;
+ 
+ const issues=[];
+ let required=0, assigned=0;
+ let posStats = {};
+ data.positions.forEach(p => posStats[p.id] = { name: p.name, extraHours: 0, missingHours: 0, vacantShifts: 0, vacantHours: 0 });
+
+ DAYS.forEach((d,day)=>{
+   data.shifts.forEach(s=>{
+     data.positions.forEach(pos=>{
+       const req=Number(data.needs[day+"_"+s.id+"_"+pos.id]||0);
+       if(!req)return;
+       required+=req;
+       const got=Object.entries(data.schedule).filter(([k])=>{
+         const p=k.split("_"); return Number(p[0])===day&&p[1]===s.id&&p[2]===pos.id;
+       }).length;
+       assigned+=got;
+       if(got<req) {
+         issues.push({type:"red",title:`Vacante en ${DAYS[day]} ${s.name}`,text:`Falta ${req-got} persona(s) para el puesto de ${pos.name}.`});
+         posStats[pos.id].vacantShifts += (req - got);
+         posStats[pos.id].vacantHours += (req - got) * shiftHours(s);
+       }
+     });
+   });
+ });
+
+ data.workers.forEach(w=>{
+   const h=getAssignedHours(w.id);
+   const contract=contractedTarget(w);
+   const max=exceptionalWeeklyMax(w);
+   const extra=getExceptionalHours(w.id);
+
+   if(h>contract+0.01){
+     if(h<=max+0.01){
+       issues.push({type:"yellow",title:`Refuerzo excepcional: ${w.name}`,text:`Tiene ${h}h frente a ${contract}h contratadas (+${extra}h).`});
+       if(posStats[w.positionId])posStats[w.positionId].extraHours+=extra;
+     }else{
+       issues.push({type:"red",title:`Límite semanal superado: ${w.name}`,text:`Tiene ${h}h y el máximo permitido por este motor es ${max}h.`});
+     }
+   }else if(h<contract-0.01){
+     issues.push({type:"yellow",title:`Faltan horas: ${w.name}`,text:`Tiene ${h}h frente a ${contract}h contratadas (faltan ${Math.abs(contract-h)}h).`});
+     if(posStats[w.positionId])posStats[w.positionId].missingHours+=Math.abs(contract-h);
+   }
+
+   const days=getAssignedDays(w.id).size;
+   if(days>w.maxDays)issues.push({type:"red",title:`Exceso de días pactados: ${w.name}`,text:`Trabaja ${days} días, su máximo pactado es ${w.maxDays}.`});
+   if(days>LABOR_RULES.maxWorkingDaysPerWeek)issues.push({type:"red",title:`⚖ Descanso semanal insuficiente: ${w.name}`,text:`Trabaja ${days} días/semana. Art. 37.1 ET exige mínimo 1,5 días de descanso (máx. 6 días laborales).`});
+
+   // Detectar días en que dobla y verificar que la suma no excede 9h
+   DAYS.forEach((_,dayIdx)=>{
+     const dayShifts=assignmentEntries(w.id).filter(a=>a.day===dayIdx);
+     if(dayShifts.length>1){
+       const dh=getDailyAssignedHours(w.id,dayIdx);
+       if(!w.allowDouble) issues.push({type:"red",title:`Dobla sin permiso: ${w.name}`,text:`${DAYS[dayIdx]}: tiene ${dayShifts.length} turnos pero no tiene activada la opción "puede doblar".`});
+       if(dh>LABOR_RULES.dailyOrdinaryMax+0.01) issues.push({type:"red",title:`⚖ Doble turno excede 9h: ${w.name}`,text:`${DAYS[dayIdx]}: suma de turnos = ${dh}h, supera el máximo legal de 9h (Art. 34.3 ET).`});
+       else if(w.allowDouble) issues.push({type:"green-info",title:`🔄 Dobla: ${w.name}`,text:`${DAYS[dayIdx]}: dos turnos asignados (${dh}h total). Dentro del límite legal de 9h.`});
+     }
+   });
+
+   DAYS.forEach((_,dayIdx)=>{
+     const dh=getDailyAssignedHours(w.id,dayIdx);
+     if(dh>LABOR_RULES.dailyOrdinaryMax+0.01)
+       issues.push({type:"red",title:`⚖ Límite diario superado: ${w.name}`,text:`${DAYS[dayIdx]}: ${dh}h asignadas; máximo legal ${LABOR_RULES.dailyOrdinaryMax}h (Art. 34.3 ET).`});
+   });
+ });
+
+ let insightsHTML = "";
+ let simulatedExtraWorkersList = [];
+ let globalExtraHoursNeeded = 0;
+ 
+ Object.values(posStats).forEach(stat => {
+   const totalDeficit = stat.vacantHours + stat.missingHours;
+   globalExtraHoursNeeded += totalDeficit;
+   
+   if (totalDeficit > 0) {
+     // Las horas contractuales pendientes NO se convierten en una recomendación
+     // de contratación: primero deben intentarse asignar al personal existente.
+     if(stat.missingHours>0){
+       insightsHTML += `
+        <div class="ai-card">
+          <div class="ai-icon">⏱</div>
+          <div class="ai-content">
+            <strong>Reequilibrar plantilla actual — ${stat.name}</strong>
+            <p>Hay <b>${Math.round(stat.missingHours*100)/100}h</b> de contrato pendientes. Estas horas deben intentarse cubrir con el personal actual antes de considerar nuevas contrataciones.</p>
+          </div>
+        </div>`;
+     }
+
+     if(stat.vacantHours>0){
+       const personsNeeded = Math.ceil(stat.vacantHours / 40);
+       simulatedExtraWorkersList.push({ name: `[Necesidad adicional] - ${Math.round(stat.vacantHours)}h (${stat.name})`, hours: Math.round(stat.vacantHours), position: stat.name });
+       insightsHTML += `
+        <div class="ai-card">
+          <div class="ai-icon">👤</div>
+          <div class="ai-content">
+            <strong>Necesidad adicional para ${stat.name}</strong>
+            <p>Después de priorizar las horas contratadas, siguen existiendo <b>${Math.round(stat.vacantHours*100)/100}h</b> de cobertura vacante. Si no existe ningún trabajador actual compatible, se puede estudiar incorporar personal adicional (estimación orientativa: <b>${personsNeeded}</b> trabajador(es) de 40h).</p>
+          </div>
+        </div>`;
+     }
+   }
+ });
+
+ insightsHTML += `
+   <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--glass-border); border-radius: 14px; padding: 18px; margin-top: 20px;">
+     <strong style="display:block; margin-bottom: 10px; font-size:15px; color:#a5b4fc;">📊 Propuesta de Plantilla Combinada (Actual + Extra Simulado)</strong>
+     <div style="font-size: 13px; color: var(--muted); margin-bottom: 12px;">Primero se deben completar las horas contratadas del personal actual. Solo las necesidades que permanezcan vacantes después de ese ajuste justifican estudiar personal adicional.</div>
+     <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+       ${data.workers.map(w => `<span class="badge blue">${esc(w.name)} (${getAssignedHours(w.id)}h / ${w.hours}h)</span>`).join("")}
+       ${simulatedExtraWorkersList.map(ew => `<span class="badge purple" style="border: 1px dashed #d8b4fe">${esc(ew.name)}</span>`).join("")}
+     </div>
+   </div>
+ `;
+
+ if (!insightsHTML || globalExtraHoursNeeded === 0) {
+   if (required === 0) {
+       insightsHTML = `<div class="empty">Configura las necesidades para ver la simulación de personal extra.</div>`;
+   } else {
+       insightsHTML = `
+      <div class="ai-card" style="border-color:rgba(16, 185, 129, 0.3); background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(0,0,0,0.1))">
+        <div class="ai-icon">✨</div>
+        <div class="ai-content">
+          <strong style="color: #6ee7b7">Plantilla Dimensionada Perfectamente</strong>
+          <p>El personal actual cubre exactamente las necesidades requeridas sin necesidad de personal extra simulado.</p>
+        </div>
+      </div>`;
+   }
+ }
+ insightsBox.innerHTML = insightsHTML;
+
+ if(!issues.length && required>0){
+   box.innerHTML='<div class="notice ok" style="background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.2); color: #d1fae5;"><strong>Todo en orden 🚀</strong><br>El cuadrante se ha generado sin conflictos laborales ni vacantes.</div>';
+ } else if(!issues.length) {
+   box.innerHTML='<div class="empty">No hay turnos configurados aún.</div>';
+ } else {
+   box.innerHTML=issues.map(i=>`<div class="worker-card"><div><span class="badge ${i.type==='green-info'?'green':i.type}" style="margin-bottom:8px">${i.type==="red"?"Alerta Crítica":i.type==="green-info"?"Turno partido OK":"Advertencia"}</span> <strong style="display:block">${esc(i.title)}</strong><div class="kpi">${esc(i.text)}</div></div></div>`).join("");
+ }
+
+ const pct=required?Math.round(assigned/required*100):100;
+ hoursBox.innerHTML=`
+   <div class="stat" style="margin-bottom:16px; background:rgba(0,0,0,0.2)"><strong>${pct}%</strong><span>Cobertura total</span></div>
+   <div class="stat" style="background:rgba(0,0,0,0.2)"><strong>${assigned} / ${required}</strong><span>Turnos asignados</span></div>`;
+
+ document.getElementById("coverage").innerHTML=`<div class="progress" style="height:12px; margin-bottom:10px; background:rgba(0,0,0,0.3)"><i style="transform:scaleX(calc(${pct} / 100))"></i></div><div style="text-align:right; font-size:13px; color:var(--muted)">${pct}% Completado</div>`;
+
+ const totalContractedHours = data.workers.reduce((acc, w) => acc + w.hours, 0);
+ const hoursCoveredSum = Object.keys(data.schedule).reduce((acc, k) => {
+   const sid = k.split("_")[1];
+   const s = data.shifts.find(x => x.id === sid);
+   return acc + (s ? shiftHours(s) : 0);
+ }, 0);
+ 
+ const hoursRatio = totalContractedHours > 0 ? Math.min(100, Math.round((hoursCoveredSum / totalContractedHours) * 100)) : 0;
+ comparisonBox.innerHTML = `
+   <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px;">
+     <span>Horas Cubiertas / Asignadas: <strong>${hoursCoveredSum} h</strong></span>
+     <span>Total Contratadas: <strong>${totalContractedHours} h</strong></span>
+   </div>
+   <div class="progress" style="height: 12px; background: rgba(0,0,0,0.3);"><i style="width: ${hoursRatio}%; background: linear-gradient(90deg, var(--accent-1), var(--green));"></i></div>
+   <div class="kpi" style="margin-top: 8px; text-align: right;">${hoursRatio}% de aprovechamiento de la plantilla</div>
+ `;
+}
+
+function renderSchedule(){
+ const box=document.getElementById("scheduleBox");
+ if(!data.shifts.length||!data.workers.length){box.innerHTML='<div class="empty" style="border:none">Faltan trabajadores o turnos para mostrar el cuadrante.</div>';return}
+ let h='<div class="schedule"><table><thead><tr><th>Turno / Franja</th>'+DAYS.map(d=>`<th>${d}</th>`).join("")+'</tr></thead><tbody>';
+ data.shifts.forEach(s=>{
+  h+=`<tr><th><strong>${esc(s.name)}</strong><br><span style="color:var(--muted); font-size:12px; font-weight:400">${s.start} - ${s.end} (${shiftHours(s)}h)</span></th>`;
+  DAYS.forEach((d,day)=>{
+    let content="";
+    data.positions.forEach(pos=>{
+      const assigned=[];
+      Object.entries(data.schedule).forEach(([k,wid])=>{
+        const parts=k.split("_");
+        if(Number(parts[0])===day&&parts[1]===s.id&&parts[2]===pos.id)assigned.push({key:k,wid});
+      });
+      const required=Number(data.needs[day+"_"+s.id+"_"+pos.id]||0);
+      if(required>0){
+        content+=`<div class="kpi" style="margin:8px 2px 4px; padding-bottom:2px; border-bottom:1px solid rgba(255,255,255,0.1)"><strong>${esc(pos.name)}</strong> <span style="float:right">${assigned.length}/${required}</span></div>`;
+        content+=assigned.map(a=>{
+          const w=data.workers.find(x=>x.id===a.wid);
+          // Detectar si este trabajador ya tiene otro turno este mismo día (dobla)
+          const otherShiftsToday = Object.entries(data.schedule).filter(([k,v])=>{
+            if(v!==a.wid||k===a.key)return false;
+            const p=k.split("_"); return Number(p[0])===day&&p[1]!==s.id;
+          });
+          const isDouble = otherShiftsToday.length > 0;
+          return `<div class="cell ${isDouble?'doubling':''}" data-worker="${a.wid}" onmouseover="highlightWorker('${a.wid}')" onmouseout="clearHighlight()" onclick="editAssignment('${a.key}')">
+            <span style="font-size: 10px; background: ${isDouble?'rgba(168,85,247,0.3)':'rgba(99, 102, 241, 0.2)'}; color: ${isDouble?'#d8b4fe':'#818cf8'}; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-bottom: 2px;">${isDouble?'🔄 DOBLA':('📅 '+DAYS[day].slice(0,3))}</span>
+            <strong>${esc(w?.name||"—")}</strong>
+            <small>${w?getAssignedHours(w.id)+'h totales':''}</small>
+          </div>`;
+        }).join("");
+        for(let i=assigned.length;i<required;i++)content+=`<div class="cell conflict"><strong>VACANTE</strong><small>Asignar manual</small></div>`;
+      }
+    });
+    h+=`<td>${content||'<span style="color:rgba(255,255,255,0.1); font-size:24px; display:block; text-align:center; margin-top:20px">-</span>'}</td>`;
+  });h+='</tr>';
+ });
+ box.innerHTML=h+'</tbody></table></div>';
+ renderHours();
+ 
+ if(document.getElementById('subTabPersonal').classList.contains('active')) {
+   const sel = document.getElementById('scheduleWorkerSelect');
+   const currentVal = sel.value;
+   sel.innerHTML = '<option value="">-- Elige un empleado --</option>' + 
+     data.workers.map(w => `<option value="${w.id}">${esc(w.name)} (${getAssignedHours(w.id)}h)</option>`).join("");
+   if(currentVal) sel.value = currentVal;
+   renderPersonalSchedule();
+ }
+}
+
+function highlightWorker(workerId) {
+  document.querySelectorAll(`.cell[data-worker="${workerId}"]`).forEach(cell => { cell.classList.add('highlighted'); });
+}
+
+function clearHighlight() {
+  document.querySelectorAll('.cell.highlighted').forEach(cell => { cell.classList.remove('highlighted'); });
+}
+
+function renderHours(){
+ const box=document.getElementById("hoursSummary");
+ if(!data.workers.length){box.innerHTML='<div class="empty" style="border:none">Sin datos.</div>';return}
+ const rows = data.workers.map(w=>{
+  const h=workerAssignments(w.id).reduce((a,x)=>a+shiftHours(data.shifts.find(s=>s.id===x.shift)),0);
+  const pct=w.hours?Math.min(100,Math.round(h/w.hours*100)):0;
+  const extra=getExceptionalHours(w.id);
+  const diff=h-w.hours;
+  let statusIcon="🟡", statusText="Faltan horas", barColor="var(--yellow)";
+  if(h===w.hours){statusIcon="🟢"; statusText="Horas completas"; barColor="var(--green)";}
+  else if(h>w.hours&&h<=LABOR_RULES.weeklyAbsoluteMax){statusIcon="🟠"; statusText=`Refuerzo +${extra}h`; barColor="var(--yellow)";}
+  else if(h>LABOR_RULES.weeklyAbsoluteMax){statusIcon="🔴"; statusText=`EXCEDE 40h/sem!`; barColor="var(--red)";}
+  const days=getAssignedDays(w.id).size;
+  // Contar días en que dobla
+  const doubledDays = DAYS.map((_,d)=>assignmentEntries(w.id).filter(a=>a.day===d).length).filter(c=>c>1).length;
+  const restWarn=days>LABOR_RULES.maxWorkingDaysPerWeek?`<span class="badge red" style="font-size:10px; margin-left:6px">⚠ ${days} días (máx. 6)</span>`:"";
+  return `<div style="margin-bottom:16px; padding:12px 16px; border-radius:12px; background:rgba(255,255,255,0.02); border:1px solid var(--glass-border);">
+    <div style="display:flex;justify-content:space-between; align-items:center; margin-bottom:6px; flex-wrap:wrap; gap:4px;">
+      <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+        <strong>${esc(w.name)}</strong>
+        <span style="font-size:12px; color:var(--muted)">${esc(data.positions.find(p=>p.id===w.positionId)?.name||"")}</span>
+        ${restWarn}
+      </div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span style="font-size:12px; color:var(--muted)">${statusIcon} ${statusText}</span>
+        <span class="badge ${diff<-0.01?'yellow':diff>0.01?'orange':'green'}" style="font-size:11px">${h} / ${w.hours} h${extra>0?` (+${extra} refuerzo)`:''}</span>
+      </div>
+    </div>
+    <div class="progress"><i style="transform:scaleX(calc(${Math.min(100,pct)} / 100)); background:${barColor}"></i></div>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px; font-size:11px; color:var(--muted);">
+      <span>${days} días · ${pct}% del contrato</span>
+      ${doubledDays>0?`<span class="badge purple" style="font-size:10px;">🔄 ${doubledDays} día${doubledDays>1?'s':''} doblando</span>`:''}
+    </div>
+  </div>`
+ });
+ box.innerHTML=rows.join("");
+}
+function editAssignment(key){
+ const wid=data.schedule[key];const w=data.workers.find(x=>x.id===wid);const [day,sid,pid]=key.split("_");const s=data.shifts.find(x=>x.id===sid);const pos=data.positions.find(x=>x.id===pid);
+ document.getElementById("modalTitle").textContent="Modificar Asignación";
+ document.getElementById("modalContent").innerHTML=`
+ <div style="background:rgba(0,0,0,0.2); padding:16px; border-radius:12px; margin-bottom:20px; border:1px solid rgba(255,255,255,0.05)">
+   <p style="margin:0 0 5px 0; color:var(--muted)">Día y Turno</p>
+   <strong style="font-size:16px">${esc(DAYS[day])} • ${esc(s.name)} (${s.start}-${s.end})</strong>
+   <div class="kpi" style="margin-top:6px; color:var(--accent-1)">Puesto: ${esc(pos?.name||"")}</div>
+ </div>
+ <label>Seleccionar Trabajador</label>
+ <select id="editWorker" style="margin-bottom:24px; font-size:16px; padding:14px">
+   ${data.workers.map(x=>`<option value="${x.id}" ${x.id===wid?"selected":""}>${esc(x.name)} (${getAssignedHours(x.id)}h / ${x.hours}h)</option>`).join("")}
+ </select>
+ <div class="form-actions" style="margin-top:0">
+   <button class="btn primary" style="flex:1; padding:14px" onclick="saveAssignment('${key}')">Guardar cambios</button>
+   <button class="btn danger" style="padding:14px" onclick="deleteAssignment('${key}')">Vaciar</button>
+ </div>`;
+ document.getElementById("modal").classList.add("show");
+}
+function saveAssignment(key){
+ const wid=document.getElementById("editWorker").value;
+ const [day,sid]=key.split("_");
+ const w=data.workers.find(x=>x.id===wid);
+ const d=Number(day);
+ if(!w)return;
+
+ if(canAssign(w,d,sid,key,data.schedule,false)){
+   data.schedule[key]=wid;save();closeModal();renderSchedule();renderStats();renderStatsWithIcons();return;
+ }
+
+ const contract=contractedTarget(w);
+ const exceptionalAllowed=exceptionalWeeklyMax(w)>contract;
+ if(exceptionalAllowed&&getAssignedHours(w.id,data.schedule)>=contract-0.001&&
+    canAssign(w,d,sid,key,data.schedule,true)){
+   if(confirm(`Esta asignación llevará a ${w.name} por encima de sus ${contract}h contratadas y utilizará horas de refuerzo. ¿Continuar?`)){
+     data.schedule[key]=wid;save();closeModal();renderSchedule();renderStats();renderStatsWithIcons();
+   }
+   return;
+ }
+
+ alert(`No se puede asignar: se superaría una restricción de jornada, descanso, solapamiento, días máximos o el límite semanal. Objetivo: respetar las ${contract}h contratadas.`);
+}
+function deleteAssignment(key){delete data.schedule[key];save();closeModal();renderSchedule();renderStats();renderStatsWithIcons()}
+function closeModal(){document.getElementById("modal").classList.remove("show")}
+
+function loadDemo(){
+ data={
+  positions:[{id:"p1",name:"Sala"},{id:"p2",name:"Cocina"},{id:"p3",name:"Barra"},{id:"p4",name:"Encargado"}],
+  workers:[
+   {id:"w1",name:"Marta Díaz",hours:40,maxDays:5,positionId:"p1",allowDouble:true},
+   {id:"w2",name:"Luis Pérez",hours:30,maxDays:5,positionId:"p2",allowDouble:false},
+   {id:"w3",name:"Carlos",hours:40,maxDays:5,positionId:"p3",allowDouble:true},
+   {id:"w4",name:"Sofía",hours:20,maxDays:4,positionId:"p1",allowDouble:false},
+   {id:"w5",name:"David",hours:16,maxDays:3,positionId:"p2",allowDouble:true},
+   {id:"w6",name:"Ana",hours:24,maxDays:4,positionId:"p1",allowDouble:false},
+   {id:"w7",name:"Jorge",hours:40,maxDays:5,positionId:"p2",allowDouble:true},
+   {id:"w8",name:"Laura",hours:20,maxDays:4,positionId:"p3",allowDouble:false},
+   {id:"w9",name:"Sergio R.",hours:40,maxDays:5,positionId:"p4",allowDouble:true},
+   {id:"w10",name:"Clara",hours:16,maxDays:3,positionId:"p4",allowDouble:false}
+  ],
+  shifts:[
+   {id:"s1",name:"Turno Mañana",start:"09:00",end:"17:00",hours:8},
+   {id:"s2",name:"Turno Noche",start:"17:00",end:"01:00",hours:8}
+  ],
+  needs:{},exceptions:[
+   {id:"e1",workerId:"w1",day:4,shiftId:"s2",type:"unavailable"},
+   {id:"e2",workerId:"w2",day:5,shiftId:"s2",type:"unavailable"},
+   {id:"e3",workerId:"w4",day:6,shiftId:"s1",type:"unavailable"},
+   {id:"e4",workerId:"w5",day:5,shiftId:"s1",type:"unavailable"},
+   {id:"e5",workerId:"w8",day:2,shiftId:"s2",type:"preferred"}
+  ],
+  schedule:[],
+  clockRecords:[
+   {id:"ci1",workerId:"w1",date:"2026-06-01",type:"in",time:"08:55"},
+   {id:"ci2",workerId:"w1",date:"2026-06-01",type:"out",time:"17:05"}
+  ],
+  vacations:[
+   {id:"v1",workerId:"w3",start:"2026-07-01",end:"2026-07-15",reason:"Vacaciones de verano"}
+  ]
+ };
+ DAYS.forEach((_,d)=>data.shifts.forEach(s=>{
+  const busy=d>=4; 
+  data.needs[d+"_"+s.id+"_p1"]=busy?4:2; 
+  data.needs[d+"_"+s.id+"_p2"]=busy?2:1;
+  data.needs[d+"_"+s.id+"_p3"]=busy?1:1;
+  data.needs[d+"_"+s.id+"_p4"]=busy?1:0;
+ }));
+ save();generateSchedule();
+}
+function resetData(){
+ if(!confirm("¿Borrar toda la configuración y plantillas? Esto no se puede deshacer."))return;
+ data={workers:[],shifts:[],needs:{},positions:[],exceptions:[],schedule:[],clockRecords:[],vacations:[]};save();scheduleRender();
+}
+// ─── PANEL DE CUMPLIMIENTO LEGAL ───────────────────────────────────────────
+function renderCompliance(){
+ const box=document.getElementById("compliancePanel");
+ if(!box)return;
+ if(!data.workers.length||!data.shifts.length){
+   box.innerHTML='<div class="empty">Configura trabajadores y turnos para ver el análisis de cumplimiento.</div>';return;
+ }
+
+ let sections=[];
+
+ // 1. Verificación horas semanales (Art. 34.1)
+ const hoursChecks=data.workers.map(w=>{
+   const h=getAssignedHours(w.id);
+   const contract=contractedTarget(w);
+   const extra=getExceptionalHours(w.id);
+   let status="ok",icon="✅",msg="";
+   if(h>LABOR_RULES.weeklyAbsoluteMax){status="error";icon="🚫";msg=`${h}h supera el límite legal de 40h (Art. 34.1 ET).`;}
+   else if(extra>0){status="warn";icon="⚠️";msg=`${h}h (${extra}h de refuerzo por encima de contrato). Requiere acuerdo previo.`;}
+   else if(Math.abs(h-contract)>0.01){status="warn";icon="⏳";msg=`${h}h de ${contract}h contratadas. Faltan ${(contract-h).toFixed(1)}h por asignar.`;}
+   else{msg=`${h}h — Contrato cubierto al 100%.`;}
+   return {w,status,icon,msg};
+ });
+
+ const hoursErrorCount=hoursChecks.filter(x=>x.status==="error").length;
+ const hoursWarnCount=hoursChecks.filter(x=>x.status==="warn").length;
+ sections.push(`
+   <div style="margin-bottom:24px;">
+     <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+       <span style="font-size:18px;">${hoursErrorCount>0?"🚫":hoursWarnCount>0?"⚠️":"✅"}</span>
+       <div>
+         <strong style="font-size:15px;">Art. 34.1 ET — Jornada ordinaria máxima (40 h/semana)</strong>
+         <div class="kpi">${hoursErrorCount>0?`${hoursErrorCount} infracción(es) crítica(s)`:hoursWarnCount>0?`${hoursWarnCount} trabajador(es) sin horas completas`:"Todos los trabajadores dentro del límite legal."}</div>
+       </div>
+       <span class="badge ${hoursErrorCount>0?"red":hoursWarnCount>0?"yellow":"green"}" style="margin-left:auto">${hoursErrorCount>0?"ERROR":hoursWarnCount>0?"AVISO":"OK"}</span>
+     </div>
+     <div style="display:grid; gap:8px;">
+       ${hoursChecks.map(x=>`
+         <div style="display:flex; align-items:flex-start; gap:10px; padding:10px 14px; border-radius:10px; background:rgba(255,255,255,0.02); border:1px solid ${x.status==="error"?"rgba(239,68,68,0.3)":x.status==="warn"?"rgba(245,158,11,0.25)":"rgba(16,185,129,0.2)"};">
+           <span style="font-size:16px; margin-top:1px;">${x.icon}</span>
+           <div><strong>${esc(x.w.name)}</strong><div class="kpi" style="margin-top:2px;">${x.msg}</div></div>
+         </div>`).join("")}
+     </div>
+   </div>`);
+
+ // 2. Verificación jornada diaria (Art. 34.3)
+ let dailyViolations=[];
+ data.workers.forEach(w=>{
+   DAYS.forEach((_,day)=>{
+     const dh=getDailyAssignedHours(w.id,day);
+     if(dh>LABOR_RULES.dailyOrdinaryMax+0.01)
+       dailyViolations.push(`${esc(w.name)} — ${DAYS[day]}: ${dh}h (máx. ${LABOR_RULES.dailyOrdinaryMax}h)`);
+   });
+ });
+ sections.push(`
+   <div style="margin-bottom:24px;">
+     <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+       <span style="font-size:18px;">${dailyViolations.length>0?"🚫":"✅"}</span>
+       <div>
+         <strong style="font-size:15px;">Art. 34.3 ET — Jornada ordinaria máxima diaria (9 h/día)</strong>
+         <div class="kpi">${dailyViolations.length>0?`${dailyViolations.length} infracción(es) detectada(s)`:"Ninguna jornada diaria supera el límite legal."}</div>
+       </div>
+       <span class="badge ${dailyViolations.length>0?"red":"green"}" style="margin-left:auto">${dailyViolations.length>0?"ERROR":"OK"}</span>
+     </div>
+     ${dailyViolations.length>0?`<div style="display:grid; gap:6px;">${dailyViolations.map(v=>`<div style="padding:8px 14px; border-radius:8px; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3); font-size:13px; color:#fca5a5;">🚫 ${v}</div>`).join("")}</div>`:''}
+   </div>`);
+
+ // 3. Descanso entre jornadas (Art. 34.3 — 12h)
+ let restViolations=[];
+ data.workers.forEach(w=>{
+   const assignments=workerAssignments(w.id).sort((a,b)=>a.day-b.day);
+   for(let i=0;i<assignments.length-1;i++){
+     const a=assignments[i], b=assignments[i+1];
+     if(b.day-a.day===1){
+       const sA=data.shifts.find(s=>s.id===a.shift), sB=data.shifts.find(s=>s.id===b.shift);
+       if(sA&&sB){
+         const endA=shiftEndAbsoluteMinutes(sA);
+         const startB=toMinutes(sB.start)+(toMinutes(sB.start)<toMinutes(sA.start)?1440:0);
+         const restMins=startB+1440-endA;
+         if(restMins<LABOR_RULES.minimumDailyRestHours*60)
+           restViolations.push(`${esc(w.name)} — entre ${DAYS[a.day]} (${sA.end}) y ${DAYS[b.day]} (${sB.start}): ${Math.round(restMins/60*10)/10}h descanso (mín. 12h)`);
+       }
+     }
+   }
+ });
+ sections.push(`
+   <div style="margin-bottom:24px;">
+     <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+       <span style="font-size:18px;">${restViolations.length>0?"🚫":"✅"}</span>
+       <div>
+         <strong style="font-size:15px;">Art. 34.3 ET — Descanso mínimo entre jornadas (12 h)</strong>
+         <div class="kpi">${restViolations.length>0?`${restViolations.length} caso(s) con descanso insuficiente`:"Todos los descansos entre jornadas son correctos."}</div>
+       </div>
+       <span class="badge ${restViolations.length>0?"red":"green"}" style="margin-left:auto">${restViolations.length>0?"ERROR":"OK"}</span>
+     </div>
+     ${restViolations.length>0?`<div style="display:grid; gap:6px;">${restViolations.map(v=>`<div style="padding:8px 14px; border-radius:8px; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3); font-size:13px; color:#fca5a5;">😴 ${v}</div>`).join("")}</div>`:''}
+   </div>`);
+
+ // 4. Descanso semanal (Art. 37.1 — 1,5 días)
+ let weeklyRestViolations=[];
+ data.workers.forEach(w=>{
+   const days=getAssignedDays(w.id).size;
+   if(days>LABOR_RULES.maxWorkingDaysPerWeek)
+     weeklyRestViolations.push(`${esc(w.name)} — ${days} días trabajados (máx. 6 según Art. 37.1 ET: 1,5 días de descanso/semana)`);
+ });
+ sections.push(`
+   <div style="margin-bottom:24px;">
+     <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+       <span style="font-size:18px;">${weeklyRestViolations.length>0?"🚫":"✅"}</span>
+       <div>
+         <strong style="font-size:15px;">Art. 37.1 ET — Descanso semanal mínimo (1,5 días / 36 h continuas)</strong>
+         <div class="kpi">${weeklyRestViolations.length>0?`${weeklyRestViolations.length} trabajador(es) sin descanso semanal suficiente`:"Todos los trabajadores tienen suficiente descanso semanal."}</div>
+       </div>
+       <span class="badge ${weeklyRestViolations.length>0?"red":"green"}" style="margin-left:auto">${weeklyRestViolations.length>0?"ERROR":"OK"}</span>
+     </div>
+     ${weeklyRestViolations.length>0?`<div style="display:grid; gap:6px;">${weeklyRestViolations.map(v=>`<div style="padding:8px 14px; border-radius:8px; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3); font-size:13px; color:#fca5a5;">🏖 ${v}</div>`).join("")}</div>`:''}
+   </div>`);
+
+ // 5. Horas extra (>40h semana — Art. 35 ET)
+ let overtimeWorkers=data.workers.filter(w=>getAssignedHours(w.id)>LABOR_RULES.weeklyAbsoluteMax);
+ sections.push(`
+   <div style="margin-bottom:24px;">
+     <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+       <span style="font-size:18px;">${overtimeWorkers.length>0?"⚠️":"✅"}</span>
+       <div>
+         <strong style="font-size:15px;">Art. 35 ET — Horas extraordinarias</strong>
+         <div class="kpi">Máx. 80 h extra/año. Requieren acuerdo expreso y retribución o compensación en descanso.</div>
+       </div>
+       <span class="badge ${overtimeWorkers.length>0?"orange":"green"}" style="margin-left:auto">${overtimeWorkers.length>0?"REVISAR":"OK"}</span>
+     </div>
+     ${overtimeWorkers.length>0?`<div style="display:grid; gap:6px;">${overtimeWorkers.map(w=>`<div style="padding:8px 14px; border-radius:8px; background:rgba(249,115,22,0.1); border:1px solid rgba(249,115,22,0.3); font-size:13px; color:#fb923c;">⏱ ${esc(w.name)}: ${getAssignedHours(w.id)}h esta semana (${getAssignedHours(w.id)-40}h extra). Verificar acuerdo y compensación.</div>`).join("")}</div>`:''}
+   </div>`);
+
+ // Resumen final
+ const totalErrors=[...dailyViolations,...restViolations,...weeklyRestViolations].length + hoursChecks.filter(x=>x.status==="error").length + overtimeWorkers.length;
+ const summary=totalErrors===0
+   ? `<div style="padding:20px 24px; border-radius:14px; background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3); display:flex; align-items:center; gap:14px; margin-bottom:24px;">
+       <span style="font-size:32px;">✅</span>
+       <div><strong style="font-size:16px; color:#6ee7b7;">Cuadrante legalmente compliant</strong><div class="kpi" style="margin-top:4px;">Todos los artículos verificados están en orden. El cuadrante puede publicarse.</div></div>
+     </div>`
+   : `<div style="padding:20px 24px; border-radius:14px; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3); display:flex; align-items:center; gap:14px; margin-bottom:24px;">
+       <span style="font-size:32px;">🚫</span>
+       <div><strong style="font-size:16px; color:#f87171;">${totalErrors} incidencia(s) legal(es) detectada(s)</strong><div class="kpi" style="margin-top:4px;">Revisa y corrige los errores antes de publicar el cuadrante.</div></div>
+     </div>`;
+
+ box.innerHTML=summary+sections.join("");
+}
+
+// ─── RESUMEN REAL DE FICHAJES ──────────────────────────────────────────────
+function renderClockSummary(){
+ const box=document.getElementById("clockSummary");
+ if(!box)return;
+ if(!data.clockRecords.length||!data.workers.length){
+   box.innerHTML='<div class="empty">Sin fichajes registrados aún.</div>';return;
+ }
+
+ // Agrupar fichajes por trabajador y fecha
+ const grouped={};
+ data.clockRecords.forEach(r=>{
+   const key=r.workerId+"_"+r.date;
+   if(!grouped[key])grouped[key]={workerId:r.workerId,date:r.date,entries:[],exits:[]};
+   if(r.type==="in")grouped[key].entries.push(r.time);
+   else grouped[key].exits.push(r.time);
+ });
+
+ const rows=Object.values(grouped).map(g=>{
+   const w=data.workers.find(x=>x.id===g.workerId);
+   let realH=0;
+   const minEntries=Math.min(g.entries.length,g.exits.length);
+   const sortedIn=[...g.entries].sort();
+   const sortedOut=[...g.exits].sort();
+   for(let i=0;i<minEntries;i++){
+     let diff=(toMinutes(sortedOut[i])-toMinutes(sortedIn[i]))/60;
+     if(diff<0)diff+=24;
+     realH+=diff;
+   }
+   realH=Math.round(realH*100)/100;
+   const hasIssue=g.entries.length!==g.exits.length;
+   const deviation=hasIssue?"Fichaje incompleto":realH>0?"":" — ";
+   return {w,date:g.date,realH,hasIssue,sortedIn,sortedOut,deviation};
+ }).sort((a,b)=>a.date>b.date?1:-1);
+
+ if(!rows.length){box.innerHTML='<div class="empty">No hay datos suficientes.</div>';return;}
+
+ let html=`<div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Empleado</th><th>Entrada(s)</th><th>Salida(s)</th><th>Horas reales</th><th>Estado</th></tr></thead><tbody>`;
+ rows.forEach(r=>{
+   const cls=r.hasIssue?"red":"green";
+   const statusText=r.hasIssue?`⚠ Fichaje incompleto`:`✓ ${r.realH}h registradas`;
+   html+=`<tr>
+     <td>${r.date}</td>
+     <td><strong>${esc(r.w?.name||"Desconocido")}</strong></td>
+     <td>${r.sortedIn.join(", ")||"—"}</td>
+     <td>${r.sortedOut.join(", ")||"—"}</td>
+     <td><span class="badge ${r.realH>0&&!r.hasIssue?"green":"yellow"}">${r.hasIssue?"?":r.realH+"h"}</span></td>
+     <td><span class="badge ${cls}" style="font-size:11px">${statusText}</span></td>
+   </tr>`;
+ });
+ html+="</tbody></table></div>";
+
+ // Resumen por trabajador
+ const byWorker={};
+ rows.forEach(r=>{if(r.w){if(!byWorker[r.w.id])byWorker[r.w.id]={w:r.w,total:0};byWorker[r.w.id].total+=r.realH;}});
+ html+=`<div style="margin-top:20px; display:grid; gap:8px;">
+   <strong style="font-size:14px; margin-bottom:4px;">Total horas reales fichadas esta semana:</strong>
+   ${Object.values(byWorker).map(x=>{
+     const diff=Math.round((x.total-x.w.hours)*100)/100;
+     const cls=diff<-0.25?"hours-low":diff>0.25?"hours-over":"hours-ok";
+     return `<div style="display:flex; justify-content:space-between; padding:8px 14px; border-radius:8px; background:rgba(255,255,255,0.02); border:1px solid var(--glass-border);">
+       <strong>${esc(x.w.name)}</strong>
+       <div style="display:flex; gap:8px; align-items:center;">
+         <span class="hours-badge ${cls}">${x.total}h fichadas / ${x.w.hours}h contrato</span>
+         ${diff!==0?`<span class="badge ${diff>0?'orange':'yellow'}" style="font-size:11px">${diff>0?"+":""}${diff}h</span>`:""}
+       </div>
+     </div>`;
+   }).join("")}
+ </div>`;
+ box.innerHTML=html;
+}
+
+// ─── EXPORTAR CSV ─────────────────────────────────────────────────────────
+function exportCSV(){
+ if(!data.workers.length||!data.shifts.length){alert("No hay datos para exportar.");return;}
+ let csv="Turno;Día;Puesto;Empleado;Horas Turno\n";
+ data.shifts.forEach(s=>{
+   DAYS.forEach((d,day)=>{
+     data.positions.forEach(pos=>{
+       Object.entries(data.schedule).forEach(([k,wid])=>{
+         const parts=k.split("_");
+         if(Number(parts[0])===day&&parts[1]===s.id&&parts[2]===pos.id){
+           const w=data.workers.find(x=>x.id===wid);
+           csv+=`"${s.name} (${s.start}-${s.end})";"${d}";"${pos.name}";"${w?.name||"—"}";"${shiftHours(s)}h"\n`;
+         }
+       });
+     });
+   });
+ });
+ // Resumen horas por trabajador
+ csv+="\nResumen Semanal por Trabajador\nEmpleado;Puesto;Contrato (h);Asignadas (h);Diferencia;Estado\n";
+ data.workers.forEach(w=>{
+   const h=getAssignedHours(w.id);
+   const diff=h-w.hours;
+   const estado=h===w.hours?"✓ Completo":h<w.hours?`⚠ Faltan ${w.hours-h}h`:`⚠ Refuerzo +${h-w.hours}h`;
+   const pos=data.positions.find(p=>p.id===w.positionId);
+   csv+=`"${w.name}";"${pos?.name||"—"}";"${w.hours}";"${h}";"${diff>=0?"+":""}${diff}";"${estado}"\n`;
+ });
+ const blob=new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8;"});
+ const url=URL.createObjectURL(blob);
+ const a=document.createElement("a");
+ a.href=url; a.download="cuadrante_semanal.csv"; a.click();
+ URL.revokeObjectURL(url);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 🎯 MOTOR DE OPTIMIZACIÓN DE PLANTILLA
+// ══════════════════════════════════════════════════════════════════════════════
+
+// Tipos de contrato disponibles con sus parámetros
+const CONTRACT_TYPES = [
+  { id:'full40', label:'Jornada completa', hours:40, days:5, tag:'full',  tagLabel:'40h/semana' },
+  { id:'part30', label:'Parcial 30h',      hours:30, days:5, tag:'p30',   tagLabel:'30h/semana' },
+  { id:'part20', label:'Parcial 20h',      hours:20, days:4, tag:'p20',   tagLabel:'20h/semana' },
+  { id:'part16', label:'Parcial 16h',      hours:16, days:4, tag:'p16',   tagLabel:'16h/semana' },
+  { id:'part12', label:'Parcial 12h',      hours:12, days:3, tag:'p12',   tagLabel:'12h/semana' },
+];
+
+// Última recomendación generada (para poder aplicarla / exportarla)
+let lastRecommendation = null;
+
+function runOptimizer(){
+  if(!data.positions.length||!data.shifts.length){
+    alert("Configura turnos, puestos y necesidades antes de analizar."); return;
+  }
+
+  const costPerHour   = parseFloat(document.getElementById('optCostPerHour').value)||9.5;
+  const weeks         = parseInt(document.getElementById('optWeeks').value)||4;
+  const strategy      = document.getElementById('optStrategy').value;
+  const allowedTypes = CONTRACT_TYPES.filter(c=>{
+    const cb = document.getElementById('optCT_'+c.id);
+    return cb ? cb.checked : false;
+  });
+  if(!allowedTypes.length){ alert("Selecciona al menos un tipo de contrato."); return; }
+
+  // ─── 1. CALCULAR HORAS NECESARIAS TOTALES POR PUESTO ────────────────────
+  const neededByPosition = {}; // posId -> { totalHours, slotHours, byDay[] }
+  data.positions.forEach(p => neededByPosition[p.id] = { posId:p.id, totalHoursNeeded:0, slotDetails:[] });
+
+  DAYS.forEach((_,day)=>{
+    data.shifts.forEach(s=>{
+      const sh = shiftHours(s);
+      data.positions.forEach(pos=>{
+        const req = Number(data.needs[day+'_'+s.id+'_'+pos.id]||0);
+        if(req>0){
+          const hoursNeeded = req * sh;
+          neededByPosition[pos.id].totalHoursNeeded += hoursNeeded;
+          neededByPosition[pos.id].slotDetails.push({day,dayName:DAYS[day],shift:s,pos,req,sh,hoursNeeded});
+        }
+      });
+    });
+  });
+
+  // ─── 2. HORAS YA CUBIERTAS POR PLANTILLA ACTUAL (lo que puede dar) ───────
+  const coveredByPosition = {};
+  data.positions.forEach(p => coveredByPosition[p.id] = 0);
+
+  // Simulamos el cuadrante actual para ver cuántas horas están asignadas por puesto
+  Object.entries(data.schedule).forEach(([k,wid])=>{
+    const parts = k.split('_');
+    const posId = parts[2];
+    const sid   = parts[1];
+    const s     = data.shifts.find(x=>x.id===sid);
+    if(s && coveredByPosition[posId]!==undefined) coveredByPosition[posId] += shiftHours(s);
+  });
+
+  // ─── 3. DÉFICIT POR PUESTO ───────────────────────────────────────────────
+  const deficitByPosition = {};
+  data.positions.forEach(p=>{
+    deficitByPosition[p.id] = Math.max(0, neededByPosition[p.id].totalHoursNeeded - coveredByPosition[p.id]);
+  });
+
+  const totalDeficitHours = Object.values(deficitByPosition).reduce((a,b)=>a+b,0);
+
+  // ─── 4. RECOMENDACIONES POR PUESTO ──────────────────────────────────────
+  const recommendations = [];
+
+  data.positions.forEach(pos=>{
+    let deficit = deficitByPosition[pos.id];
+    if(deficit < 0.01) return; // sin déficit en este puesto
+
+    const posRecs = [];
+    let remaining = deficit;
+
+    // Ordenar tipos según estrategia
+    let orderedTypes = [...allowedTypes];
+    if(strategy==='fulltime')  orderedTypes.sort((a,b)=>b.hours-a.hours);
+    if(strategy==='parttime')  orderedTypes.sort((a,b)=>a.hours-b.hours);
+    if(strategy==='minstaff')  orderedTypes.sort((a,b)=>b.hours-a.hours);
+    if(strategy==='balanced'){
+      // Priorizar contratos que encajan mejor con los turnos disponibles
+      // Calcular turno dominante para este puesto
+      const domShiftHours = getDominantShiftHours(pos.id);
+      orderedTypes.sort((a,b)=>{
+        const fitA = Math.abs((a.hours/a.days) - domShiftHours);
+        const fitB = Math.abs((b.hours/b.days) - domShiftHours);
+        return fitA - fitB;
+      });
+    }
+
+    // Algoritmo greedy de ajuste
+    for(const ctype of orderedTypes){
+      if(remaining < 0.01) break;
+      const count = Math.floor(remaining / ctype.hours);
+      if(count > 0){
+        posRecs.push({ ctype, count, hours: count * ctype.hours });
+        remaining -= count * ctype.hours;
+      }
+    }
+    // Si queda un residuo, recomendamos el contrato parcial más pequeño
+    if(remaining > 0.5){
+      // Buscar el más pequeño >= remaining
+      const fit = [...allowedTypes].sort((a,b)=>a.hours-b.hours).find(c=>c.hours>=remaining)
+                || allowedTypes[allowedTypes.length-1];
+      posRecs.push({ ctype:fit, count:1, hours:fit.hours, partial:true, residual:remaining });
+      remaining = 0;
+    }
+
+    recommendations.push({ pos, deficit, posRecs });
+  });
+
+  // ─── 5. TOTALES ─────────────────────────────────────────────────────────
+  const totalNewWorkers = recommendations.reduce((a,r)=>a+r.posRecs.reduce((b,x)=>b+x.count,0),0);
+  const totalNewHoursWeek = recommendations.reduce((a,r)=>a+r.posRecs.reduce((b,x)=>b+x.hours,0),0);
+  const totalNewCostWeek  = totalNewHoursWeek * costPerHour;
+  const totalNewCostMonth = totalNewCostWeek * weeks;
+  const coverageNow = totalDeficitHours>0 ? Math.round((1-(totalDeficitHours/Object.values(neededByPosition).reduce((a,b)=>a+b.totalHoursNeeded,0)))*100) : 100;
+
+  lastRecommendation = { recommendations, totalNewWorkers, totalNewHoursWeek, totalNewCostWeek, totalNewCostMonth, costPerHour, weeks, totalDeficitHours, coverageNow };
+
+  // ─── 6. RENDER DE RESULTADOS ────────────────────────────────────────────
+  renderOptimizerResults(lastRecommendation);
+  renderOptimizerDetail(neededByPosition, coveredByPosition, deficitByPosition);
+  document.getElementById('optimizerDetail').style.display='block';
+  document.getElementById('optimizerSimCard').style.display='block';
+  renderOptimizerSim(recommendations);
+}
+
+function getDominantShiftHours(posId){
+  // Devuelve la duración media de los turnos requeridos para un puesto
+  let totalH=0, count=0;
+  DAYS.forEach((_,day)=>{
+    data.shifts.forEach(s=>{
+      const req=Number(data.needs[day+'_'+s.id+'_'+posId]||0);
+      if(req>0){ totalH+=shiftHours(s); count++; }
+    });
+  });
+  return count>0 ? totalH/count : 8;
+}
+
+function renderOptimizerResults(rec){
+  const box = document.getElementById('optimizerResults');
+  const coverageAfter = rec.totalDeficitHours<=0.01 ? 100 : 100;
+
+  // Banner resumen
+  let html = `
+    <div class="opt-summary-banner" style="background:${rec.totalDeficitHours<0.01?'rgba(16,185,129,0.1)':'rgba(251,191,36,0.08)'}; border:1px solid ${rec.totalDeficitHours<0.01?'rgba(16,185,129,0.3)':'rgba(251,191,36,0.3)'};">
+      <span style="font-size:36px;">${rec.totalDeficitHours<0.01?'✅':'⚡'}</span>
+      <div style="flex:1;">
+        <strong style="font-size:17px; color:${rec.totalDeficitHours<0.01?'#6ee7b7':'#fbbf24'};">
+          ${rec.totalDeficitHours<0.01?'La plantilla actual cubre el 100% del servicio':'Déficit detectado: se necesitan '+Math.round(rec.totalDeficitHours*10)/10+'h adicionales/semana'}
+        </strong>
+        <div class="kpi" style="margin-top:4px;">Cobertura actual con plantilla: <b>${rec.coverageNow}%</b> → Con la ampliación propuesta: <b>100%</b></div>
+      </div>
+    </div>`;
+
+  if(rec.totalDeficitHours < 0.01){
+    html += `<div class="notice" style="background:rgba(16,185,129,0.1); border-color:rgba(16,185,129,0.3); color:#d1fae5;">
+      🎉 No hay déficit de cobertura. La plantilla actual está dimensionada correctamente para cubrir todas las necesidades configuradas. Si siguen quedando vacantes tras generar el cuadrante, puede deberse a restricciones de disponibilidad o preferencias individuales.
+    </div>`;
+    box.innerHTML = html;
+    return;
+  }
+
+  // KPIs
+  html += `<div class="opt-kpi-row">
+    <div class="opt-kpi"><strong>${rec.totalNewWorkers}</strong><span>Personas nuevas</span></div>
+    <div class="opt-kpi"><strong>${Math.round(rec.totalNewHoursWeek)}h</strong><span>Horas / semana</span></div>
+    <div class="opt-kpi"><strong>${rec.totalNewCostWeek.toLocaleString('es-ES',{style:'currency',currency:'EUR',maximumFractionDigits:0})}</strong><span>Coste / semana</span></div>
+    <div class="opt-kpi"><strong>${rec.totalNewCostMonth.toLocaleString('es-ES',{style:'currency',currency:'EUR',maximumFractionDigits:0})}</strong><span>Coste ${rec.weeks} sem.</span></div>
+  </div>`;
+
+  // Desglose por puesto
+  html += `<div style="margin-top:20px; display:grid; gap:12px;">`;
+  rec.recommendations.forEach(r=>{
+    if(!r.posRecs.length) return;
+    const totalPersonas = r.posRecs.reduce((a,x)=>a+x.count,0);
+    const totalH        = r.posRecs.reduce((a,x)=>a+x.hours,0);
+    html += `<div class="opt-rec-card">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+        <div>
+          <strong style="font-size:15px;">${esc(r.pos.name)}</strong>
+          <div class="kpi" style="margin-top:2px;">Déficit: <b>${Math.round(r.deficit*10)/10}h</b>/semana</div>
+        </div>
+        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+          <span class="contract-badge">👤 ${totalPersonas} persona${totalPersonas!==1?'s':''}</span>
+          <span class="contract-badge">⏱ ${Math.round(totalH)}h/sem</span>
+          <span class="contract-badge">💰 ${(totalH*rec.costPerHour).toLocaleString('es-ES',{style:'currency',currency:'EUR',maximumFractionDigits:0})}/sem</span>
+        </div>
+      </div>
+      <div style="margin-top:14px; display:flex; gap:8px; flex-wrap:wrap;">
+        ${r.posRecs.map(x=>`
+          <div style="flex:1; min-width:160px; padding:12px; border-radius:10px; background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.08);">
+            <span class="opt-tag ${x.ctype.tag}" style="margin-bottom:6px; display:inline-flex;">${x.ctype.tagLabel}</span>
+            <div style="font-size:22px; font-weight:700; color:#fbbf24; margin:4px 0;">${x.count}×</div>
+            <div style="font-size:13px; color:#e2e8f0;">${x.ctype.label}</div>
+            <div style="font-size:12px; color:var(--muted); margin-top:2px;">${x.ctype.hours}h · ${x.ctype.days} días/sem${x.partial?' ⚠ residual':''}</div>
+            <div class="deficit-bar" style="margin-top:8px;"><i style="transform:scaleX(calc(${Math.min(100,Math.round(x.hours/r.deficit*100))} / 100))"></i></div>
+            <div style="font-size:11px; color:var(--muted); margin-top:4px;">Cubre ${Math.min(100,Math.round(x.hours/r.deficit*100))}% del déficit del puesto</div>
+          </div>`).join('')}
+      </div>
+    </div>`;
+  });
+  html += `</div>`;
+
+  // Nota sobre residuos
+  const hasPartials = rec.recommendations.some(r=>r.posRecs.some(x=>x.partial));
+  if(hasPartials){
+    html += `<div class="notice" style="margin-top:16px; background:rgba(245,158,11,0.08); border-color:rgba(245,158,11,0.3); color:#fef3c7; font-size:13px;">
+      ⚠ Algunos puestos tienen un déficit residual que no encaja exactamente con ningún tipo de contrato seleccionado. Se ha redondeado al alza con el contrato más pequeño disponible. Considera añadir más tipos de contrato o ajustar las necesidades.
+    </div>`;
+  }
+
+  box.innerHTML = html;
+}
+
+function renderOptimizerDetail(neededByPos, coveredByPos, deficitByPos){
+  const box = document.getElementById('optimizerDetailContent');
+  let html = `<div class="table-wrap"><table>
+    <thead><tr>
+      <th>Puesto</th><th>Día</th><th>Turno</th><th>Personas req.</th><th>Asignadas</th><th>Horas req.</th><th>Horas cubiertas</th><th>Déficit h</th><th>Estado</th>
+    </tr></thead><tbody>`;
+
+  data.positions.forEach(pos=>{
+    const slots = (neededByPos[pos.id]?.slotDetails)||[];
+    if(!slots.length) return;
+
+    // Horas asignadas por slot
+    slots.forEach(slot=>{
+      const assigned = Object.entries(data.schedule).filter(([k])=>{
+        const p=k.split('_'); return Number(p[0])===slot.day && p[1]===slot.shift.id && p[2]===pos.id;
+      }).length;
+      const covH = assigned * slot.sh;
+      const defH = Math.max(0, slot.hoursNeeded - covH);
+      const pct  = slot.hoursNeeded>0 ? Math.round(covH/slot.hoursNeeded*100) : 100;
+      const cls  = pct>=100?'green':pct>=50?'yellow':'red';
+      html += `<tr>
+        <td><strong>${esc(pos.name)}</strong></td>
+        <td>${slot.dayName}</td>
+        <td>${esc(slot.shift.name)}<div class="kpi">${slot.shift.start}-${slot.shift.end}</div></td>
+        <td>${slot.req}</td>
+        <td>${assigned}</td>
+        <td>${slot.hoursNeeded}h</td>
+        <td>${covH}h</td>
+        <td>${defH>0?'<span class="badge red">'+defH+'h</span>':'<span class="badge green">0h</span>'}</td>
+        <td><span class="badge ${cls}">${pct}%</span></td>
+      </tr>`;
+    });
+  });
+  html += '</tbody></table></div>';
+  box.innerHTML = html;
+}
+
+function renderOptimizerSim(recommendations){
+  const box = document.getElementById('optimizerSimContent');
+  if(!recommendations.length){ box.innerHTML='<div class="empty">Sin recomendaciones pendientes.</div>'; return; }
+
+  // Construir trabajadores simulados
+  const simWorkers = [];
+  recommendations.forEach(r=>{
+    r.posRecs.forEach(x=>{
+      for(let i=0;i<x.count;i++){
+        simWorkers.push({
+          id: uid('sim'),
+          name: `[Nuevo] ${esc(r.pos.name)} ${i+1}`,
+          hours: x.ctype.hours,
+          maxDays: x.ctype.days,
+          positionId: r.pos.id,
+          contractType: x.ctype.hours===40?'indefinido':'parcial',
+          isSimulated: true,
+          ctypeLabel: x.ctype.label
+        });
+      }
+    });
+  });
+
+  // Tabla de trabajadores simulados
+  let html = `<div style="display:grid; gap:8px; margin-bottom:20px;">
+    <strong style="color:#fbbf24;">Trabajadores propuestos (${simWorkers.length} personas):</strong>
+    ${simWorkers.map(w=>`
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 16px; border-radius:10px; background:rgba(251,191,36,0.05); border:1px dashed rgba(251,191,36,0.3);">
+        <div>
+          <strong style="color:#fbbf24;">${w.name}</strong>
+          <div class="kpi" style="margin-top:2px;">${esc(data.positions.find(p=>p.id===w.positionId)?.name||'')} · ${w.ctypeLabel} · ${w.hours}h/sem · ${w.maxDays} días</div>
+        </div>
+        <span class="badge yellow" style="font-size:11px;">Simulado</span>
+      </div>`).join('')}
+  </div>`;
+
+  // Calcular cobertura simulada por puesto
+  html += `<strong style="color:#a5b4fc; display:block; margin-bottom:10px;">Cobertura proyectada con plantilla ampliada:</strong>
+  <div style="display:grid; gap:8px;">`;
+  data.positions.forEach(pos=>{
+    const totalNeeded = Object.keys(data.needs).filter(k=>k.includes('_'+pos.id)).reduce((a,k)=>{
+      const sh=data.shifts.find(s=>k.split('_')[1]===s.id); return a+Number(data.needs[k]||0)*(sh?shiftHours(sh):0);
+    },0);
+    const currentCovered = (() => {
+      let h=0;
+      Object.entries(data.schedule).forEach(([k,wid])=>{ if(k.split('_')[2]===pos.id){ const s=data.shifts.find(x=>x.id===k.split('_')[1]); if(s) h+=shiftHours(s); } });
+      return h;
+    })();
+    const simH = simWorkers.filter(w=>w.positionId===pos.id).reduce((a,w)=>a+w.hours,0);
+    const projected = Math.min(totalNeeded, currentCovered+simH);
+    const pct = totalNeeded>0 ? Math.min(100,Math.round(projected/totalNeeded*100)) : 100;
+    html += `<div style="padding:12px 16px; border-radius:10px; background:rgba(0,0,0,0.2); border:1px solid var(--glass-border);">
+      <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+        <strong>${esc(pos.name)}</strong>
+        <span class="badge ${pct>=100?'green':pct>=75?'yellow':'red'}">${pct}% cubierto</span>
+      </div>
+      <div class="progress"><i style="transform:scaleX(calc(${pct} / 100)); background:${pct>=100?'var(--green)':pct>=75?'var(--yellow)':'var(--red)'}"></i></div>
+      <div style="display:flex; justify-content:space-between; margin-top:6px; font-size:12px; color:var(--muted);">
+        <span>Actual: ${currentCovered}h · + ${simH}h simuladas</span>
+        <span>Necesario: ${totalNeeded}h</span>
+      </div>
+    </div>`;
+  });
+  html += '</div>';
+  box.innerHTML = html;
+}
+
+function applyRecommendation(){
+  if(!lastRecommendation || !lastRecommendation.recommendations.length){
+    alert("Ejecuta primero el análisis."); return;
+  }
+  if(!confirm(`¿Añadir ${lastRecommendation.totalNewWorkers} trabajador(es) simulado(s) a la plantilla real y regenerar el cuadrante? Podrás editar sus datos después.`)) return;
+
+  lastRecommendation.recommendations.forEach(r=>{
+    r.posRecs.forEach(x=>{
+      for(let i=0;i<x.count;i++){
+        const existing = data.workers.filter(w=>w.positionId===r.pos.id&&w.name.startsWith('[Propuesto]')).length;
+        data.workers.push({
+          id: uid('w'),
+          name: `[Propuesto] ${r.pos.name} ${existing+i+1}`,
+          hours: x.ctype.hours,
+          maxDays: x.ctype.days,
+          positionId: r.pos.id,
+          contractType: x.ctype.hours===40?'indefinido':'parcial',
+        });
+      }
+    });
+  });
+  save();
+  generateSchedule();
+  document.querySelector('[data-tab="workers"]').click();
+  alert('✅ Trabajadores añadidos. Revisa la pestaña Personal para personalizar nombres y datos. Se ha regenerado el cuadrante.');
+}
+
+function exportOptimizerCSV(){
+  if(!lastRecommendation){ alert("Ejecuta el análisis primero."); return; }
+  const r = lastRecommendation;
+  let csv = "INFORME DE PLANTILLA ÓPTIMA\n\n";
+  csv += `Déficit total;${Math.round(r.totalDeficitHours*10)/10}h/semana\n`;
+  csv += `Cobertura actual;${r.coverageNow}%\n`;
+  csv += `Trabajadores nuevos propuestos;${r.totalNewWorkers}\n`;
+  csv += `Horas nuevas/semana;${Math.round(r.totalNewHoursWeek)}h\n`;
+  csv += `Coste/semana estimado;${r.totalNewCostWeek.toFixed(2)} €\n`;
+  csv += `Coste ${r.weeks} semanas;${r.totalNewCostMonth.toFixed(2)} €\n\n`;
+  csv += "Puesto;Tipo contrato;Personas;Horas/sem;Coste/sem\n";
+  r.recommendations.forEach(rec=>{
+    rec.posRecs.forEach(x=>{
+      csv += `"${rec.pos.name}";"${x.ctype.label}";${x.count};${x.hours};${(x.hours*r.costPerHour).toFixed(2)}\n`;
+    });
+  });
+  const blob=new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8;"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a"); a.href=url; a.download="informe_plantilla_optima.csv"; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── THEME TOGGLE ────────────────────────────────────────────────────────────
+function toggleTheme(){
+  const html = document.documentElement;
+  const isDark = html.getAttribute('data-theme') !== 'light';
+  html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  document.getElementById('themeBtn').textContent = isDark ? '☀️' : '🌙';
+  localStorage.setItem('shiftos-theme', isDark ? 'light' : 'dark');
+}
+function initTheme(){
+  const saved = localStorage.getItem('shiftos-theme') || 'dark';
+  document.documentElement.setAttribute('data-theme', saved);
+  document.getElementById('themeBtn').textContent = saved === 'light' ? '☀️' : '🌙';
+}
+
+// ── TOAST ────────────────────────────────────────────────────────────────────
+let toastTimer;
+function showToast(msg, icon='✅', duration=3000){
+  const t = document.getElementById('toast');
+  const m = document.getElementById('toastMsg');
+  document.querySelector('#toast .toast-icon').textContent = icon;
+  m.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=> t.classList.remove('show'), duration);
+}
+
+// ── WEEK SELECTOR ────────────────────────────────────────────────────────────
+let weekOffset = 0;
+function getWeekLabel(offset=0){
+  const now = new Date();
+  now.setDate(now.getDate() + offset * 7);
+  const day = now.getDay() || 7;
+  const mon = new Date(now); mon.setDate(now.getDate() - day + 1);
+  const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+  const fmt = d => d.toLocaleDateString('es-ES',{day:'2-digit',month:'short'});
+  return `${fmt(mon)} – ${fmt(sun)}`;
+}
+function changeWeek(delta){
+  weekOffset += delta;
+  document.getElementById('weekLabel').textContent = weekOffset === 0 ? getWeekLabel(0) : getWeekLabel(weekOffset);
+  showToast(`Semana: ${getWeekLabel(weekOffset)}`, '📅', 2000);
+}
+function initWeekLabel(){
+  document.getElementById('weekLabel').textContent = getWeekLabel(0);
+}
+
+// ── OVERRIDE save() TO SHOW TOAST ────────────────────────────────────────────
+const _origSave = save;
+
+// renderStatsWithIcons is now merged into renderStats
+function renderStatsWithIcons(){ renderStats(); }
+
+load();
+initTheme();
+initWeekLabel();
+// Initial render — immediate, no rAF delay
+_activeTab = 'dashboard';
+renderStats();
+scheduleRender(true);
+</script>
+</body>
+</html>
